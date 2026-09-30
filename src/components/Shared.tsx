@@ -4,7 +4,7 @@ import { Link, NavLink } from 'react-router-dom';
 import type { Product, ProductStatus } from '../types';
 
 export function Logo({ light = false }: { light?: boolean }) {
-  return <Link className={`logo ${light ? 'logo-light' : ''}`} to="/"><span className="logo-mark">N</span><span>Nearloom<small>made around you</small></span></Link>;
+  return <Link className={`logo ${light ? 'logo-light' : ''}`} to="/"><span className="logo-mark">N</span><span>What Not?<small>made around you</small></span></Link>;
 }
 export function PublicHeader() {
   const [open,setOpen]=useState(false);

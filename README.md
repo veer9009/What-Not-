@@ -1,4 +1,4 @@
-# Nearloom — Hyperlocal Marketplace Demo
+# What Not? — Hyperlocal Marketplace Demo
 
 A polished frontend-only concept demo for a local marketplace connecting buyers with nearby makers, artisans, and small businesses.
 
