@@ -1,0 +1,11 @@
+import type { Product } from '../types';
+
+export const products: Product[] = [
+  { id:'teddy', name:'Handmade Teddy Bear', seller:'Mitti & Thread Studio', price:650, distance:1.2, radius:3, rating:4.9, category:'Gifts', stock:8, description:'A soft, hand-stitched keepsake made with natural cotton and a whole lot of care.', status:'approved', image:'https://images.unsplash.com/photo-1559454403-b8fb88521f11?auto=format&fit=crop&w=900&q=85', verified:true },
+  { id:'clay-pot', name:'Decorative Clay Pot', seller:'Nila Pottery House', price:450, distance:2.1, radius:3, rating:4.7, category:'Home Decor', stock:12, description:'Wheel-thrown terracotta with hand-painted botanical details, made in small batches.', status:'approved', image:'https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&w=900&q=85', verified:true },
+  { id:'candles', name:'Handmade Candle Set', seller:'Glow Local Co.', price:350, distance:0.8, radius:2, rating:4.8, category:'Handmade', stock:16, description:'Three hand-poured soy candles with calming sandalwood, rose and citrus notes.', status:'approved', image:'https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=900&q=85', verified:true },
+  { id:'woven-bag', name:'Woven Market Bag', seller:'Threadfolk Collective', price:890, distance:2.7, radius:3, rating:4.6, category:'Fashion', stock:5, description:'A sturdy handwoven carryall created by neighbourhood women artisans.', status:'approved', image:'https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=900&q=85', verified:true },
+  { id:'earrings', name:'Brass Moon Earrings', seller:'Aarika Jewellery', price:520, distance:1.7, radius:2, rating:4.9, category:'Jewellery', stock:9, description:'Lightweight hammered brass earrings shaped and finished by hand.', status:'pending', image:'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=900&q=85', verified:true },
+  { id:'basket', name:'Palm Leaf Basket', seller:'The Craft Courtyard', price:740, distance:3.4, radius:3, rating:4.5, category:'Crafts', stock:6, description:'A naturally dyed storage basket woven from locally sourced palm leaves.', status:'rejected', image:'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=900&q=85', verified:false }
+];
+
