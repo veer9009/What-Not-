@@ -12,5 +12,11 @@ describe('filterProducts', () => {
   it('returns no products when filters have no match', () => {
     expect(filterProducts(products, 'not here', 'All', 3)).toEqual([]);
   });
+  it('honours each seller radius and sorts closest first', () => {
+    const listed = [
+      { ...products[0], id:'far', distance:1.4, radius:1 as const },
+      { ...products[1], id:'near', distance:0.4, radius:3 as const }
+    ];
+    expect(filterProducts(listed, '', 'All', 3).map(p => p.id)).toEqual(['near']);
+  });
 });
-

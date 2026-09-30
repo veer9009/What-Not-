@@ -28,4 +28,9 @@ describe('marketplace demo routes',()=>{
     open('/admin');
     expect(screen.getByRole('link',{name:/chat with us on whatsapp/i})).toHaveAttribute('href','https://wa.me/918080098882?text=Hi%2C%20I%20would%20like%20to%20know%20more%20about%20your%20local%20marketplace.');
   });
+  it('shows a not-found state for an unknown seller edit route',()=>{
+    open('/seller/products/missing/edit');
+    expect(screen.getByText(/listing was not found/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading',{name:/add new product/i})).not.toBeInTheDocument();
+  });
 });

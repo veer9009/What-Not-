@@ -5,8 +5,9 @@ export function filterProducts(products: Product[], query: string, category: str
   return products.filter(product =>
     product.status === 'approved' &&
     product.distance <= radius &&
+    product.distance <= product.radius &&
+    product.stock > 0 &&
     (category === 'All' || product.category === category) &&
     (!term || `${product.name} ${product.seller}`.toLowerCase().includes(term))
-  );
+  ).sort((a,b) => a.distance - b.distance);
 }
-

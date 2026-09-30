@@ -9,4 +9,7 @@ describe('validateProduct', () => {
   it('accepts a complete valid product', () => {
     expect(validateProduct({ name:'Doll', description:'Handmade doll', category:'Handmade', price:200, stock:3, seller:'Maker', radius:2 })).toEqual({});
   });
+  it('rejects blank and nonfinite numeric input', () => {
+    expect(validateProduct({ name:'Doll', description:'Handmade', category:'Handmade', price:Number.NaN, stock:'' as unknown as number, seller:'Maker', radius:1 })).toMatchObject({ price:'Enter a positive price', stock:'Enter a valid quantity' });
+  });
 });

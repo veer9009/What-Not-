@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { demoReducer } from './demoReducer';
 import type { DemoState, Product } from '../types';
 
-const product: Product = { id: 'p1', name: 'Candle', seller: 'Maker', price: 350, distance: 0.8, radius: 2, rating: 4.8, category: 'Gifts', stock: 4, description: 'Hand-poured', status: 'pending', image: 'candle.jpg', verified: true };
+const product: Product = { id: 'p1', name: 'Candle', seller: 'Maker', price: 350, distance: 0.8, radius: 2, rating: 4.8, category: 'Gifts', stock: 4, description: 'Hand-poured', status: 'approved', image: 'candle.jpg', verified: true };
 const state: DemoState = { products: [product], cart: [] };
 
 describe('demoReducer', () => {
@@ -23,5 +23,10 @@ describe('demoReducer', () => {
     expect(edited.products[0].name).toBe('New Candle');
     expect(demoReducer(edited, { type: 'product/delete', id: 'p1' }).products).toHaveLength(0);
   });
+  it('removes unavailable products from the cart and caps quantity at stock', () => {
+    const withCart: DemoState = { ...state, cart: [{ productId: 'p1', quantity: 2 }] };
+    expect(demoReducer(withCart, { type: 'product/delete', id: 'p1' }).cart).toEqual([]);
+    expect(demoReducer(withCart, { type: 'product/status', id: 'p1', status: 'rejected' }).cart).toEqual([]);
+    expect(demoReducer(withCart, { type: 'cart/quantity', id: 'p1', quantity: 999 }).cart[0].quantity).toBe(4);
+  });
 });
-
