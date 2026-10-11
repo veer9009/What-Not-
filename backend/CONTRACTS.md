@@ -1,6 +1,6 @@
 # What Not? API contracts — Phase 2
 
-Health is implemented. Every marketplace endpoint is intentionally a **501** placeholder; request validation still returns **422** for invalid payloads. There is no database, in-memory substitute database, authentication, password hashing, payment processing, or frontend API wiring.
+Health is implemented. Every marketplace endpoint is intentionally a **501** placeholder; request validation still returns **422** for invalid payloads. Phase 3 adds ORM models and migrations, but these HTTP contracts remain unchanged and no route uses persistence. There is no authentication, password hashing, payment processing, or frontend API wiring.
 
 ## Identifiers and JSON
 
@@ -67,4 +67,32 @@ All paths have the `/api/v1` prefix.
 | POST | /admin/products/{product_id}/approve | 501 approval contract |
 | POST | /admin/products/{product_id}/reject | 501 rejection contract |
 
-Future database integration must enforce ownership, authorization, review transitions, product visibility, atomic stock checks/reservation and order creation. Health currently checks only that this process is responding. None of these contracts create SQL models, migrations or persistence.
+Future database integration must enforce ownership, authorization, review transitions, product visibility, atomic stock checks/reservation and order creation. Health currently checks only that this process is responding. Pydantic contracts do not themselves create SQL models, migrations or persistence.
+
+## Phase 3 storage mappings and contract gaps
+
+No existing Pydantic schema or HTTP behavior changed in Phase 3. These differences
+must be resolved explicitly before services connect the contracts to storage:
+
+| Contract | Database design / future integration action |
+|---|---|
+| Registration/public user omit phone | `users.phone` is required and unique. Define phone collection and response policy before authentication persistence. |
+| Order creation/response omit address ID | `orders.address_id` is required. Define address selection and buyer-address ownership validation before order persistence. |
+| Order response uses `total` | Map explicitly from `orders.total_amount`; do not rename the API silently. |
+| Product exposes one optional `image_url` | Storage uses multiple `product_images`. Map the primary image, permitting none, and design upload/storage separately. Frontend data URLs remain mock-only. |
+| Order item response uses `name` | Map from `order_items.product_name`, the stored order-time snapshot, rather than the current product name. |
+| API prices/unit prices must be positive | Database prices/unit prices allow zero as approved. Zero-price rows cannot currently validate as these API responses; choose a policy before integration. |
+| API decimals have no total precision bound | Storage is `NUMERIC(12,2)`, maximum 9,999,999,999.99. Introduce compatible API upper bounds before writing persisted amounts. Direct SQL rounds extra fractional digits while API validation rejects them. |
+| Frontend IDs are mock strings | Replace/map them to database integers during integration. Also handle PostgreSQL BIGINT IDs beyond JavaScript's exact integer range. |
+| Product API requires moderation reason consistency | Database checks status values but does not implement moderation semantics. Future services must validate reasons/transitions. |
+| API limits categories/text and validates URLs | Storage category is a string, descriptions/reasons/image URLs are text. Future services must continue applying contract validation; database writes do not automatically run Pydantic. |
+
+The two composite foreign keys on `order_items` now enforce matching order/product
+seller ownership at database level, supplementing future request/service checks.
+`OrderItem.seller_id` is copied from the order; `product_name` and `unit_price` must
+be copied from the product when the future order service creates an item. There
+is no API endpoint, snapshot-generation workflow, or stock transaction yet.
+
+Role authorization, buyer-address ownership, nonempty orders, total arithmetic,
+eligibility, state transitions and historic address handling remain service design
+work. See [DATABASE.md](DATABASE.md) for models, indexes, migrations and isolated tests.

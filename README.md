@@ -26,7 +26,7 @@ corepack pnpm build
 - Admin metrics, product approval/rejection and commission placeholder
 - WhatsApp contact link for `+91 80800 98882`
 
-Frontend content and state remain mocked in the browser. The standalone backend foundation below provides health and API contracts; it is not connected to the frontend. There is no database, real authentication, geolocation, payment processing, or map integration.
+Frontend content and state remain mocked in the browser. The standalone backend provides health, API contracts, and a PostgreSQL schema/migration foundation; it is not connected to the frontend. There is no real authentication, geolocation, payment processing, or map integration.
 
 ## Product review workflow
 
@@ -78,3 +78,18 @@ Run backend tests from `backend/`:
 From the repository root, the frontend checks remain `npm.cmd test -- --run`, `npx.cmd tsc -b`, and `npm.cmd run build`.
 
 API IDs are positive **integers** aligned with PostgreSQL `BIGSERIAL`/`BIGINT`; string IDs and booleans are rejected in JSON bodies. Existing frontend mock/string IDs remain unchanged and must be mapped or refactored when real API integration begins. See [backend API contracts](backend/CONTRACTS.md) for fields, routes, business rules and integration boundaries.
+
+## PostgreSQL persistence foundation (Phase 3)
+
+SQLAlchemy 2 typed models now define users, seller profiles, products, images,
+addresses, orders and order items. Alembic revision `0001` owns schema creation;
+application startup never creates tables or connects to a database. Existing HTTP
+routes and frontend behavior remain unchanged.
+
+See [backend/DATABASE.md](backend/DATABASE.md) for the relationship diagram,
+constraints/indexes, `DATABASE_URL`, beginner migration workflow, and tests that
+use a separate temporary PostgreSQL cluster. Existing `whatnot_db` and
+`upsc_compass` databases must not be used for migrations or tests. The implementation
+does not provision a development database. Persistence tests require PostgreSQL
+`initdb` and `pg_ctl` on PATH. API/storage mismatches are recorded explicitly in
+[the contract gaps](backend/CONTRACTS.md#phase-3-storage-mappings-and-contract-gaps).
