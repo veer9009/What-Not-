@@ -1,3 +1,6 @@
+from contextlib import asynccontextmanager
+from threading import Lock
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,10 +10,24 @@ from app.core.config import Settings
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
+
+    @asynccontextmanager
+    async def lifespan(application):
+        try:
+            yield
+        finally:
+            if application.state.database_engine is not None:
+                application.state.database_engine.dispose()
+                application.state.database_engine = None
+
     application = FastAPI(
         title="What Not? API", version="0.1.0",
-        description="Phase 2 foundation. Health works; marketplace endpoints are explicitly not implemented.",
+        description="Phase 4 database services. Health works; marketplace HTTP endpoints await authentication and geographic eligibility.",
+        lifespan=lifespan,
     )
+    application.state.settings = settings
+    application.state.database_engine = None
+    application.state.database_engine_lock = Lock()
     application.add_middleware(
         CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH", "OPTIONS"],

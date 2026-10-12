@@ -1,5 +1,11 @@
 # What Not? PostgreSQL foundation — Phase 3
 
+Phase 4 now implements repositories, business services, and a lazy request-session
+dependency on this unchanged schema. Marketplace HTTP routes remain 501; health
+remains independent of PostgreSQL. See [SERVICES.md](SERVICES.md) for current
+transactions, stock locks, workflows, and testing. The foundation description
+below records Phase 3; its deferred service work is now implemented internally.
+
 This phase adds storage definitions and migrations. The frontend still uses mock
 state, health is process-only, and marketplace routes still return 501. No routes
 open database sessions, create tables, register users, authenticate, reserve stock,
@@ -50,7 +56,7 @@ erDiagram
   delivery fee, total amount and timestamps. It has no payment fields.
 - `order_items` stores order/product/seller IDs, positive quantity, and the
   order-time `product_name` and `unit_price` snapshots. A later product edit does
-  not rewrite these stored values. There is no order creation service yet, and
+  not rewrite these stored values. Phase 4 services create these snapshots, but
   the database does not prohibit explicit updates to a snapshot row.
 
 ## Types, constraints and deletion
@@ -80,7 +86,8 @@ Each product can occur at most once per order.
 
 Partial unique indexes permit **at most one** primary image per product and
 default address per user. Zero is allowed; switching the flag must clear the old
-row first, within a future service transaction.
+row first, within a service transaction. Phase 4 default-address operations also
+lock the owning user to serialize concurrent switches.
 
 Foreign keys restrict deletion of referenced users, sellers, addresses and ordered
 products. Deleting an unreferenced product cascades to its images; explicit order
@@ -90,8 +97,9 @@ activity flags support future non-destructive workflows.
 Database constraints do not enforce role-dependent profile/order ownership,
 address ownership by the order buyer, moderation reason consistency, allowed
 state transitions, nonempty orders, eligibility, inventory reservations, subtotal
-arithmetic, or historical address snapshots. These need explicit future service
-design and transactions. Category remains a stored string; the existing API
+arithmetic, or historical address snapshots. Phase 4 services enforce these rules
+except geographic eligibility and address snapshots (referenced address delivery
+fields are protected instead). Category remains a stored string; the existing API
 currently restricts it to six demo categories.
 
 ## Index choices
@@ -229,8 +237,9 @@ checks provide the existing validation paths.
 ## API integration gaps and Phase 4
 
 See [CONTRACTS.md](CONTRACTS.md#phase-3-storage-mappings-and-contract-gaps) for
-every known storage/API mismatch. Existing contracts are intentionally unchanged.
-Agree on the phone/address contracts, money boundaries and response mappings
-before implementing authentication or order services. Frontend string IDs require
+every known storage/API mismatch. HTTP payload shapes are preserved; money and
+integer bounds now match storage. Internal inputs supply phone/address IDs, and
+response mappers resolve field/image differences. Public phone/address collection
+still needs agreement before authentication/integration. Frontend string IDs require
 mapping/refactoring when actual API integration begins, including BIGINT handling
 beyond JavaScript's exact integer range. No payments or infrastructure are included.

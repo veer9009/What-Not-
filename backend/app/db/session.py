@@ -17,6 +17,6 @@ def build_engine(settings: Settings) -> Engine:
 @contextmanager
 def session_scope(engine: Engine) -> Iterator[Session]:
     """Commit on success, roll back on failure, always close the session."""
-    with Session(engine) as session:
+    with Session(engine, expire_on_commit=False) as session:
         with session.begin():
             yield session

@@ -3,10 +3,10 @@ from typing import Annotated, Literal
 
 from pydantic import Field, HttpUrl, model_validator
 
-from .common import ContractModel, DatabaseId, Name, Price
+from .common import ContractModel, DatabaseId, MAX_INTEGER, Name, Price
 
 Description = Annotated[str, Field(min_length=1, max_length=5000)]
-Stock = Annotated[int, Field(strict=True, ge=0)]
+Stock = Annotated[int, Field(strict=True, ge=0, le=MAX_INTEGER)]
 DeliveryRadius = Literal[1, 2, 3]
 RejectionReason = Annotated[str, Field(min_length=1, max_length=2000)]
 

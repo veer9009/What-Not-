@@ -26,7 +26,20 @@ corepack pnpm build
 - Admin metrics, product approval/rejection and commission placeholder
 - WhatsApp contact link for `+91 80800 98882`
 
-Frontend content and state remain mocked in the browser. The standalone backend provides health, API contracts, and a PostgreSQL schema/migration foundation; it is not connected to the frontend. There is no real authentication, geolocation, payment processing, or map integration.
+Frontend content and state remain mocked in the browser. The standalone backend provides health, API contracts, PostgreSQL persistence, and database-backed marketplace services; it is not connected to the frontend. There is no real authentication, geolocation, payment processing, or map integration.
+
+## Database-backed services (Phase 4)
+
+User/seller/product/moderation/address/order services now enforce marketplace rules
+through focused SQLAlchemy repositories. Atomic order creation reserves stock with
+PostgreSQL row locks; eligible cancellation/rejection restores inventory once.
+No schema change was needed. Marketplace routes remain 501 until authentication
+and geographic eligibility exist; health still works without a configured database.
+The backend's provisional delivery fee is 0.00, independently of the demo's ₹49.
+
+See [backend/SERVICES.md](backend/SERVICES.md) for beginner explanations, operations,
+transaction ownership, order transitions, remaining contract gaps, and isolated
+PostgreSQL tests. No tests access `whatnot_db` or `upsc_compass`.
 
 ## Product review workflow
 

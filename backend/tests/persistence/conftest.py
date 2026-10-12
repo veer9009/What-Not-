@@ -124,7 +124,8 @@ def db(migrated_engine):
     with migrated_engine.connect() as connection:
         transaction = connection.begin()
         with Session(bind=connection, join_transaction_mode="create_savepoint") as session:
-            yield session
+            with session.begin():
+                yield session
         transaction.rollback()
 
 
