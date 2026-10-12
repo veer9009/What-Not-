@@ -1,7 +1,7 @@
 # What Not? database services — Phase 4
 
-Database-backed marketplace operations now exist as internal services. Marketplace
-HTTP routes remain **501** until authentication and geographic eligibility exist.
+Database-backed marketplace operations are exposed through selected authenticated
+Phase 5 routes. Buyer geographic workflows remain **501**.
 Health remains **200**, needs no database, and does not check database readiness.
 The frontend remains an independent browser demo.
 
@@ -9,9 +9,9 @@ The frontend remains an independent browser demo.
 
 A **repository** knows how to query, insert, filter, load relationships, and lock
 rows. It never commits and does not decide business rules. A **service** coordinates
-repositories and applies ownership, roles, stock, and lifecycle rules. A future
-route will validate HTTP input, obtain authenticated identity, call a service, and
-map its result. Keeping rules in services lets tests and HTTP use the same logic.
+repositories and applies ownership, roles, stock, and lifecycle rules. Phase 5
+routes validate input, obtain authenticated identity, call a service, and map
+its result. Keeping rules in services lets tests and HTTP use the same logic.
 
 Explicit actor IDs are **trusted internal inputs**, not authentication. No actor
 headers, fake login dependencies, or development persistence endpoints exist.
@@ -43,7 +43,7 @@ with session_scope(engine) as session:
 # Commit once on success; rollback and close on failure.
 ```
 
-Future request handlers will explicitly use `with session.begin():`. A session
+Phase 5 request dependencies explicitly use `with session.begin():`. A session
 with no transaction, or a transaction started implicitly by a read/add, is rejected
 by write services. Put the complete workflow, including reads, inside its scope.
 
@@ -56,7 +56,7 @@ changes before a savepoint: do not pass unrelated dirty objects into service cal
 Uniqueness/constraint failures become safe domain errors such as `DuplicateUser`,
 `DuplicateSeller`, and `PersistenceConflict`. Read/connection failures remain
 internal exceptions; eventual HTTP handlers must sanitize infrastructure errors.
-No current HTTP route exposes database errors.
+Phase 5 HTTP error handlers sanitize database failures.
 
 ## User and seller operations
 
@@ -65,8 +65,10 @@ changes active state. Internal `UserCreate` requires phone and an already encode
 bcrypt or Argon2id hash. Its hash is masked and excluded from serialization; public
 user responses omit it. Structural checking rejects ordinary plaintext but cannot
 prove the supplied value was cryptographically derived. Trusted callers own that
-responsibility. There is no hashing, verification, registration persistence, login,
-or JWT. Database email/phone uniqueness semantics are preserved.
+responsibility. Phase 5 `AuthService` supplies securely generated Argon2id hashes
+for public registration and verifies passwords for login. See
+[AUTHENTICATION.md](AUTHENTICATION.md) for JWTs and identity normalization.
+Database email/phone uniqueness constraints are preserved.
 
 `SellerService` creates a profile only for an active existing SELLER; one profile
 per user. It reads profiles, lists seller-owned products, and permits shop name,
@@ -76,8 +78,8 @@ editable. `seller_id` refers to a seller-profile ID, not a user ID.
 ## Product and moderation workflow
 
 Seller adds product -> FastAPI -> service -> repository -> SQLAlchemy -> PostgreSQL.
-The HTTP entry currently stops at 501; direct service calls implement the remaining
-flow today. Creation always sets PENDING. Active ADMIN callers approve/reject only
+Phase 5 seller/admin routes implement this flow with authenticated database actors.
+Creation always sets PENDING. Active ADMIN callers approve/reject only
 PENDING products. Rejection requires a trimmed nonblank reason; approval clears it.
 Editing APPROVED returns it to PENDING. Editing REJECTED keeps its reason until
 explicit resubmission returns it to PENDING and clears the reason. Activation is
@@ -161,10 +163,11 @@ strict positive BIGINTs. Money has two decimal places and a maximum of
 zero. Direct zero-price rows cannot validate as API responses or be ordered.
 
 Response mappers preserve API `total` from `total_amount` and item `name` from
-`product_name`. Phone/address remain required internal inputs but are missing from
-the deferred public contracts. See [CONTRACTS.md](CONTRACTS.md). No ORM changes or
-new migrations were required. Authentication, geography, HTTP persistence access,
-frontend integration, payments, and infrastructure remain deferred.
+`product_name`. Registration now requires phone. Address selection for public
+checkout remains deferred with geography. See [CONTRACTS.md](CONTRACTS.md).
+No ORM changes or new migrations were required. Geography, frontend integration,
+payments, and infrastructure remain deferred; selected authenticated HTTP routes
+are active. See [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Safe tests
 

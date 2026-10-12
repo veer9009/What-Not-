@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import AliasChoices, Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +15,24 @@ class Settings(BaseSettings):
         hide_input_in_errors=True,
     )
     environment: Literal["development", "test", "production"] = "development"
+    jwt_secret_key: SecretStr | None = None
+    jwt_algorithm: Literal["HS256"] = "HS256"
+    access_token_expire_minutes: int = Field(default=15, ge=1, le=60)
+
+    @field_validator("jwt_secret_key")
+    @classmethod
+    def strong_signing_key(cls, value):
+        if value is not None:
+            secret = value.get_secret_value()
+            if len(secret.encode('utf-8')) < 32 or not secret.strip() or 'REPLACE_ME' in secret.upper():
+                raise ValueError('JWT signing key requires at least 32 bytes from a secure random generator')
+        return value
+
+    @model_validator(mode='after')
+    def production_signing_key(self):
+        if self.environment == 'production' and self.jwt_secret_key is None:
+            raise ValueError('WHAT_NOT_JWT_SECRET_KEY is required in production')
+        return self
     database_url: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("DATABASE_URL", "database_url"),
     )

@@ -11,3 +11,7 @@ pytest==9.1.1
 SQLAlchemy==2.0.54
 alembic==1.20.0
 psycopg[binary]==3.3.4
+argon2-cffi==25.1.0
+PyJWT==2.15.1
+# Existing internal bcrypt hashes are upgraded to Argon2id on successful login.
+bcrypt==5.0.0

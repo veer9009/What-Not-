@@ -29,10 +29,15 @@ def run_pg(binary, *args, allowed_codes=(0,)):
     # pg_ctl's server child can inherit pipe handles on Windows. File output
     # avoids waiting for a pipe EOF that only arrives when the server stops.
     with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output:
-        result = subprocess.run(
-            [executable, *map(str, args)], stdout=output, stderr=subprocess.STDOUT,
-            timeout=60, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
-        )
+        try:
+            result = subprocess.run(
+                [executable, *map(str, args)], stdout=output, stderr=subprocess.STDOUT,
+                timeout=600 if binary == 'initdb' else 180,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            )
+        except subprocess.TimeoutExpired:
+            output.seek(0)
+            pytest.fail(f"{binary} timed out: {output.read()}")
         if result.returncode not in allowed_codes:
             output.seek(0)
             pytest.fail(f"{binary} failed: {output.read()}")
@@ -52,9 +57,12 @@ def isolated_cluster():
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     startup_attempted = False
+    initialization_completed = False
     try:
         run_pg("initdb", "-D", data, "-U", "whatnot_test", "--auth=scram-sha-256",
-               "--pwfile", password_file, "--encoding=UTF8", "--no-locale")
+               "--pwfile", password_file, "--encoding=UTF8", "--no-locale", "--no-sync",
+               "-c", "max_connections=20", "-c", "shared_buffers=16MB")
+        initialization_completed = True
         password_file.unlink()
         startup_attempted = True
         try:
@@ -78,11 +86,22 @@ def isolated_cluster():
             # data directory even when startup never reported success.
             status = run_pg("pg_ctl", "-D", data, "status", allowed_codes=(0, 3))
             if status == 0:
-                run_pg("pg_ctl", "-D", data, "-w", "-t", "30", "-m", "fast", "stop")
+                try:
+                    run_pg("pg_ctl", "-D", data, "-w", "-t", "90", "-m", "fast", "stop")
+                except (Exception, pytest.fail.Exception):
+                    if run_pg("pg_ctl", "-D", data, "status", allowed_codes=(0, 3)) == 0:
+                        # All assertions are complete and this verified generated
+                        # cluster is discarded; skip a stalled shutdown checkpoint.
+                        run_pg("pg_ctl", "-D", data, "-w", "-t", "90", "-m", "immediate", "stop")
             if run_pg("pg_ctl", "-D", data, "status", allowed_codes=(0, 3)) != 3:
                 pytest.fail(f"Temporary cluster shutdown unconfirmed; files retained at {root}")
         # A failed status/stop raises before deletion. Only this generated path is owned.
-        shutil.rmtree(root)
+        if initialization_completed:
+            shutil.rmtree(root)
+        else:
+            # initdb can leave a bootstrap child after its parent times out.
+            # Retain files when process-tree termination is unconfirmed.
+            print(f"Initialization did not complete; temporary files retained at {root}")
 
 
 @pytest.fixture

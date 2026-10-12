@@ -26,15 +26,28 @@ corepack pnpm build
 - Admin metrics, product approval/rejection and commission placeholder
 - WhatsApp contact link for `+91 80800 98882`
 
-Frontend content and state remain mocked in the browser. The standalone backend provides health, API contracts, PostgreSQL persistence, and database-backed marketplace services; it is not connected to the frontend. There is no real authentication, geolocation, payment processing, or map integration.
+Frontend content and state remain mocked in the browser. The standalone backend now provides real authentication, role/ownership authorization, PostgreSQL persistence, and marketplace services. It is not connected to the frontend. Geography, payments, and map integration remain deferred.
+
+## Authentication and authorization (Phase 5)
+
+Public BUYER/SELLER registration hashes passwords with Argon2id; ADMIN registration
+is forbidden. Login issues a short-lived JWT. Protected requests load the active
+user and role from PostgreSQL, then enforce resource ownership through services.
+Seller registration creates only the account; complete shop profiles are created
+separately. Product writes, seller profiles, own addresses/orders, and admin
+moderation are active. Buyer discovery/detail and checkout remain 501 until geography.
+
+See [backend/AUTHENTICATION.md](backend/AUTHENTICATION.md) for setup, required signing
+secret, Bearer tokens, roles, ownership, routes, HTTP errors and Ravi's concrete flow.
+No schema migration or frontend integration was introduced.
 
 ## Database-backed services (Phase 4)
 
 User/seller/product/moderation/address/order services now enforce marketplace rules
 through focused SQLAlchemy repositories. Atomic order creation reserves stock with
 PostgreSQL row locks; eligible cancellation/rejection restores inventory once.
-No schema change was needed. Marketplace routes remain 501 until authentication
-and geographic eligibility exist; health still works without a configured database.
+No schema change was needed. Phase 5 activates secure service-backed routes;
+buyer geographic workflows remain 501. Health still works without a configured database.
 The backend's provisional delivery fee is 0.00, independently of the demo's ₹49.
 
 See [backend/SERVICES.md](backend/SERVICES.md) for beginner explanations, operations,
@@ -54,7 +67,8 @@ PostgreSQL tests. No tests access `whatnot_db` or `upsc_compass`.
 
 Run all tests with `npm.cmd test -- --run` on Windows, check TypeScript with `npx.cmd tsc -b`, and build with `npm.cmd run build`. No lint script or lint configuration is currently installed.
 
-The next integration step is to agree on the product and order API contracts with the separately developed database layer. Keep ownership, moderation, eligibility and seller-order validation on the future server as well as in the UI.
+The next phase should establish server geographic eligibility before activating
+buyer discovery and checkout. Frontend integration needs its own plan and contracts.
 
 ## Backend foundation (Phase 2)
 
@@ -78,7 +92,10 @@ For macOS/Linux, use `.venv/bin/python` instead of `.\.venv\Scripts\python.exe`,
 - OpenAPI contract: http://127.0.0.1:8000/openapi.json
 - Working health check: http://127.0.0.1:8000/api/v1/health
 
-Health returns `{"status":"ok","service":"what-not-api"}`. All other route groups (`auth`, `products`, `orders`, `admin`) are contract placeholders: valid requests return **501 Not Implemented**, invalid requests return **422**. No data is saved and no tokens are issued. Success response models in the docs describe future contracts, not working persistence.
+Health returns `{"status":"ok","service":"what-not-api"}`. Configure a dedicated
+application database and `WHAT_NOT_JWT_SECRET_KEY` before using authentication or
+protected routes. See the [authentication guide](backend/AUTHENTICATION.md) for active
+routes and the three geographic contracts intentionally remaining 501.
 
 Local CORS allows `http://localhost:5173` and `http://127.0.0.1:5173`. If Vite uses a different port, edit `WHAT_NOT_CORS_ORIGINS` in `backend/.env` as a JSON array of exact origins, then restart the server. Environment variables override `.env`. The `.env` file and virtual environment are Git-ignored.
 
@@ -96,8 +113,8 @@ API IDs are positive **integers** aligned with PostgreSQL `BIGSERIAL`/`BIGINT`; 
 
 SQLAlchemy 2 typed models now define users, seller profiles, products, images,
 addresses, orders and order items. Alembic revision `0001` owns schema creation;
-application startup never creates tables or connects to a database. Existing HTTP
-routes and frontend behavior remain unchanged.
+application startup never creates tables or connects to a database. Phase 5 uses
+this unchanged schema for authenticated HTTP routes; frontend behavior is unchanged.
 
 See [backend/DATABASE.md](backend/DATABASE.md) for the relationship diagram,
 constraints/indexes, `DATABASE_URL`, beginner migration workflow, and tests that

@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import User
@@ -20,6 +20,10 @@ class UserRepository:
 
     def by_phone(self, phone: str):
         return self.session.scalar(select(User).where(User.phone == phone))
+
+    def by_normalized_email(self, email: str):
+        """Return up to two rows so legacy case collisions fail closed."""
+        return list(self.session.scalars(select(User).where(func.lower(User.email) == email).limit(2)))
 
     def list(self, offset: int, limit: int):
         return list(self.session.scalars(select(User).order_by(User.id).offset(offset).limit(limit)))

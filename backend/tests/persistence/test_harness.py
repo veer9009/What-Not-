@@ -65,3 +65,64 @@ def test_shutdown_failure_retains_cluster_files(monkeypatch):
         if owned_root and owned_root.exists():
             assert owned_root.name.startswith("whatnot-phase3-postgres-")
             shutil.rmtree(owned_root)
+
+
+def test_failed_initdb_retains_owned_files_without_deleting_possible_child_data(monkeypatch):
+    owned_root = None
+
+    def run(binary, *args, **kwargs):
+        nonlocal owned_root
+        assert binary == 'initdb'
+        data = Path(args[1])
+        data.mkdir()
+        owned_root = data.parent
+        raise RuntimeError('Bootstrap child may still be running')
+
+    monkeypatch.setattr(harness, 'run_pg', run)
+    try:
+        with pytest.raises(RuntimeError, match='Bootstrap child'):
+            next(harness.isolated_cluster.__wrapped__())
+        assert owned_root.exists(), 'Do not delete files when bootstrap child termination is unconfirmed'
+    finally:
+        # This simulated runner creates no process; its generated files are safe to remove.
+        if owned_root and owned_root.exists():
+            assert owned_root.name.startswith('whatnot-phase3-postgres-')
+            shutil.rmtree(owned_root)
+
+
+def test_failed_fast_shutdown_can_stop_owned_disposable_cluster_immediately(monkeypatch):
+    owned_root = None
+    stopped = False
+    modes = []
+
+    def run(binary, *args, **kwargs):
+        nonlocal owned_root, stopped
+        if binary == 'initdb':
+            data = Path(args[1])
+            data.mkdir()
+            owned_root = data.parent
+            return 0
+        if args[-1] == 'start':
+            raise RuntimeError('Deliberate startup failure after spawning')
+        if args[-1] == 'status':
+            return 3 if stopped else 0
+        if args[-1] == 'stop':
+            mode = args[args.index('-m') + 1]
+            modes.append(mode)
+            if mode == 'fast':
+                raise RuntimeError('Checkpoint shutdown timed out')
+            assert mode == 'immediate'
+            stopped = True
+            return 0
+        raise AssertionError('Unexpected operation')
+
+    monkeypatch.setattr(harness, 'run_pg', run)
+    try:
+        with pytest.raises(RuntimeError, match='Deliberate startup failure'):
+            next(harness.isolated_cluster.__wrapped__())
+        assert modes == ['fast', 'immediate']
+        assert stopped and not owned_root.exists()
+    finally:
+        if owned_root and owned_root.exists():
+            assert owned_root.name.startswith('whatnot-phase3-postgres-')
+            shutil.rmtree(owned_root)

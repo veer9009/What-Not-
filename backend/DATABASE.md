@@ -1,15 +1,16 @@
 # What Not? PostgreSQL foundation — Phase 3
 
 Phase 4 now implements repositories, business services, and a lazy request-session
-dependency on this unchanged schema. Marketplace HTTP routes remain 501; health
+dependency on this unchanged schema. Phase 5 activates authenticated routes; health
 remains independent of PostgreSQL. See [SERVICES.md](SERVICES.md) for current
 transactions, stock locks, workflows, and testing. The foundation description
-below records Phase 3; its deferred service work is now implemented internally.
+below records Phase 3; its deferred service work and authentication are implemented.
+See [AUTHENTICATION.md](AUTHENTICATION.md) for current routes/configuration.
 
-This phase adds storage definitions and migrations. The frontend still uses mock
-state, health is process-only, and marketplace routes still return 501. No routes
-open database sessions, create tables, register users, authenticate, reserve stock,
-or create orders. Importing the application does not connect to PostgreSQL.
+Phase 3 added storage definitions and migrations. The frontend still uses mock
+state and health is process-only. Phase 5 routes register/authenticate users and
+open lazy request sessions; buyer discovery/detail/checkout remain 501. Application
+startup/import never creates tables or connects to PostgreSQL.
 
 ## Four separate pieces
 
@@ -18,7 +19,7 @@ or create orders. Importing the application does not connect to PostgreSQL.
 | SQLAlchemy ORM models | Python mapping of tables, relationships, constraints | `app/models/` |
 | Alembic migrations | Versioned SQL schema changes applied explicitly | `alembic/versions/` |
 | Pydantic API schemas | Validate request/response payloads | `app/schemas/` |
-| FastAPI routes | HTTP entry points; marketplace behavior is still deferred | `app/api/routes/` |
+| FastAPI routes | Authenticated HTTP entry points; geography is deferred | `app/api/routes/` |
 
 Changing an ORM class does **not** change an existing database. Write/review a new
 migration, then explicitly apply it. Never use `Base.metadata.create_all()` for
@@ -43,7 +44,7 @@ erDiagram
 - Every table has an auto-incrementing `BIGSERIAL` ID, represented by Python `int`.
   Foreign-key ID columns are `BIGINT`.
 - `users` stores name, unique required email/phone, **password_hash** only, role
-  BUYER/SELLER/ADMIN, active state, and timestamps. Hash generation is not implemented.
+  BUYER/SELLER/ADMIN, active state, and timestamps. Phase 5 uses Argon2id for passwords.
 - `seller_profiles` has a unique required `user_id`, shop details, phone, required
   coordinates and verification state. A user can have zero or one profile.
 - `products` belongs to a seller profile and stores listing details, price, stock,
@@ -130,8 +131,8 @@ the approved design.
 
 `app/db/session.py` provides an explicit lazy engine factory with connection
 liveness checks and a transaction context that commits on success, rolls back on
-failure, and closes its session. The caller owns engine disposal. Routes do not
-use this factory yet, and startup does not migrate/create anything.
+failure, and closes its session. The caller owns engine disposal. Phase 5 routes
+use it through request dependencies; startup does not migrate/create anything.
 
 ## Environment configuration
 
@@ -222,6 +223,13 @@ test process outside the sandbox. Output is captured to files because a Windows
 server child can inherit output pipes and delay EOF. This does not require access
 to an existing PostgreSQL server. No manual database is inspected or tested.
 
+Phase 5 test harness diagnostics retain generated files after failed initdb when
+bootstrap-child exit is unconfirmed, as well as after unconfirmed server shutdown.
+Disposable cluster initialization uses --no-sync, 20 connections, and 16MB shared
+buffers; normal server durability remains enabled. Startup waits accommodate slow
+Windows process/disk operations. These settings affect only newly generated test
+clusters and do not change the application database or migration definitions.
+
 From the repository root, frontend validation remains:
 
 ```powershell
@@ -239,7 +247,7 @@ checks provide the existing validation paths.
 See [CONTRACTS.md](CONTRACTS.md#phase-3-storage-mappings-and-contract-gaps) for
 every known storage/API mismatch. HTTP payload shapes are preserved; money and
 integer bounds now match storage. Internal inputs supply phone/address IDs, and
-response mappers resolve field/image differences. Public phone/address collection
-still needs agreement before authentication/integration. Frontend string IDs require
+response mappers resolve field/image differences. Phase 5 registration collects
+phone; public checkout/address selection awaits geography. Frontend string IDs require
 mapping/refactoring when actual API integration begins, including BIGINT handling
 beyond JavaScript's exact integer range. No payments or infrastructure are included.

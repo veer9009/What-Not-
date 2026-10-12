@@ -1,22 +1,33 @@
 # What Not? API contracts — Phase 2
 
-Health is implemented. Every marketplace endpoint remains a **501** placeholder; request validation returns **422** for invalid payloads. Phase 4 implements database repositories/services tested directly, while HTTP access awaits authentication and geographic eligibility. There is no authentication, password hashing workflow, payment processing, or frontend API wiring. See [SERVICES.md](SERVICES.md).
+Phase 5 implements authentication and selected role/ownership-protected HTTP routes
+using Phase 4 services. Buyer discovery/detail and checkout remain **501** because
+geographic eligibility is absent. No frontend integration or payment processing.
+See [AUTHENTICATION.md](AUTHENTICATION.md) for current routes, configuration and
+security behavior, and [SERVICES.md](SERVICES.md) for business rules.
 
 ## Identifiers and JSON
 
 - `id`, `buyer_id`, `seller_id`, `product_id` and route `order_id`/`product_id` are positive integers from 1 through 9223372036854775807 (PostgreSQL signed BIGINT).
 - `seller_id` refers to `seller_profiles.id`, not `users.id`; `buyer_id` refers to `users.id`.
-- PostgreSQL generates IDs. Product creation/editing cannot supply an ID or seller identity; future authenticated HTTP integration must derive seller identity. Orders declare one seller, but buyer identity will be server-owned.
+- PostgreSQL generates IDs. Product creation derives the seller profile from the authenticated User; editing checks ownership. Public order placement remains deferred.
 - The frontend currently has string product IDs and shop names. Integration must replace/map these to integer database IDs; do not convert mock names into fabricated numeric identities now.
 - JavaScript numbers cannot exactly represent every BIGINT value. Future client integration must account for this when parsing/transporting integer IDs; the API contracts remain integers as requested.
 - Money uses finite decimal values with at most two decimal places. JSON requests can use strings such as `"250.00"`; response money is serialized as decimal strings to retain precision. Product prices must be positive; order amounts cannot be negative.
-- Unknown payload fields are rejected. Text fields are trimmed and cannot be blank. Product names/user names are limited to 120 characters, descriptions to 5000, and rejection reasons to 2000.
+- Unknown payload fields are rejected. Text fields are trimmed; passwords are preserved exactly. Names are limited to 120 characters, descriptions to 5000, and rejection reasons to 2000.
 
 ## Auth and user contracts
 
-`UserRegistration` accepts name, email, password (8–128 characters), and role `BUYER` or `SELLER` (default `BUYER`). Public registration cannot request `ADMIN`. `LoginRequest` accepts email and password; these schemas do not authenticate or hash anything. `SecretStr` masks passwords in model representations; it is not encryption or password hashing.
+`UserRegistration` accepts name, email, required phone (trimmed, 1..32), password
+(8..128 characters, preserved exactly), and BUYER/SELLER role (default BUYER).
+Public ADMIN registration is forbidden. Email is lowercased. SELLER registration
+creates only a User; complete profile creation is separate. `AuthService` generates
+Argon2id hashes. Login verifies the hash and rejects invalid/inactive accounts.
+`SecretStr` masks representations; the hashing library provides actual hashing.
 
-`PublicUserResponse` contains integer `id`, name, email, and role (`BUYER`, `SELLER`, `ADMIN`), with no password field. A token response is intentionally not defined until the authentication phase.
+`PublicUserResponse` remains integer id/name/email/role, without passwords/hashes.
+`TokenResponse` contains access_token, token_type=bearer, expires_in (seconds), and
+safe user information. GET /auth/me returns the current active database User.
 
 ## Product contracts and review
 
@@ -28,7 +39,7 @@ Health is implemented. Every marketplace endpoint remains a **501** placeholder;
 
 `ProductActivation` accepts a strict boolean is_active. `ProductRejection` requires rejection_reason. Approval is a separate admin route, so seller payloads cannot set moderation fields.
 
-Rules now implemented internally by Phase 4 services (HTTP integration remains deferred):
+Rules implemented by Phase 4 services and selected authenticated Phase 5 routes:
 
 - Create → PENDING.
 - Admin may approve/reject only PENDING products. Rejection requires a reason.
@@ -45,7 +56,10 @@ One seller_id expresses one seller per order. Schema validation cannot look up p
 
 `OrderItemResponse` includes product_id, seller_id, name, quantity and unit_price as a purchase snapshot. `OrderResponse` contains id, buyer_id, seller_id, items, status, subtotal, delivery_fee and total. It validates matching item sellers, unique products, subtotal arithmetic and total = subtotal + delivery_fee. The internal service uses a configurable provisional 0.00 delivery fee; the frontend's ₹49 mock fee is not a backend rule.
 
-Statuses: PLACED (default), ACCEPTED, PREPARING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, REJECTED. `OrderStatusUpdate` validates these values only; Phase 4 services enforce allowed transitions and trusted actor ownership. No HTTP endpoint changes order state or reserves stock.
+Statuses: PLACED, ACCEPTED, PREPARING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, REJECTED.
+Schemas validate values; services enforce transitions and authenticated ownership.
+Phase 5 allows owned order reads/transitions, including inventory restoration on
+cancellation/rejection. Public placement remains 501.
 
 ## Routes
 
@@ -54,27 +68,33 @@ All paths have the `/api/v1` prefix.
 | Method | Path | Current behavior |
 |---|---|---|
 | GET | /health | 200 process health |
-| POST | /auth/register | 501 registration contract |
-| POST | /auth/login | 501 login contract, no token |
-| GET, POST | /products | 501 list/create contracts |
-| GET, PATCH | /products/{product_id} | 501 read/edit contracts |
-| PATCH | /products/{product_id}/activation | 501 activation contract |
-| POST | /products/{product_id}/resubmit | 501 review resubmission contract |
-| GET, POST | /orders | 501 list/create contracts |
-| GET | /orders/{order_id} | 501 read contract |
-| PATCH | /orders/{order_id}/status | 501 lifecycle contract |
-| GET | /admin/products/pending | 501 review queue contract |
-| POST | /admin/products/{product_id}/approve | 501 approval contract |
-| POST | /admin/products/{product_id}/reject | 501 rejection contract |
+| POST | /auth/register | 201 BUYER/SELLER user only |
+| POST | /auth/login | 200 JWT and safe user |
+| GET | /auth/me | Active authenticated user |
+| GET | /products; /products/{product_id} | 501 geographic contracts |
+| POST | /products | SELLER, own profile; 201 PENDING product |
+| PATCH | /products/{product_id}; /products/{product_id}/activation | SELLER, owned product |
+| POST | /products/{product_id}/resubmit | SELLER, owned rejected product |
+| GET | /orders; /orders/{order_id} | BUYER/SELLER, owned orders |
+| POST | /orders | 501 geographic checkout contract |
+| PATCH | /orders/{order_id}/status | BUYER/SELLER, owned supported transition |
+| GET | /admin/products/pending | Active database ADMIN |
+| POST | /admin/products/{product_id}/approve; /reject | Active database ADMIN |
+| GET, POST, PATCH | /sellers/me | SELLER, own complete profile |
+| GET | /sellers/me/products | SELLER, own listings |
+| GET, POST | /addresses | Active user, own addresses |
+| GET, PATCH | /addresses/{address_id} | Active user, owned address |
+| POST | /addresses/{address_id}/default | Active user, owned default switch |
 
-Future database integration must enforce ownership, authorization, review transitions, product visibility, atomic stock checks/reservation and order creation. Health currently checks only that this process is responding. Pydantic contracts do not themselves create SQL models, migrations or persistence.
+Authenticated routes enforce roles/ownership through dependencies and services.
+Health checks only process response. Pydantic models do not create migrations.
 
 ## Phase 4 integration status
 
 The internal services now enforce ownership, active roles, review transitions,
 atomic order/item insertion, stock reservation/restoration, and address ownership.
 Their explicit actor IDs are trusted application inputs, never authentication.
-HTTP routes stay 501. No request actor-ID shortcuts were added.
+Phase 5 routes obtain actor IDs from authentication. No request actor-ID shortcuts exist.
 
 API input refinements align existing contracts with storage: money is at most
 9,999,999,999.99 and stock/quantity at most 2,147,483,647. Unknown fields, strict
@@ -82,12 +102,12 @@ IDs/booleans, positive prices, and decimal precision rules remain. Existing sche
 are revalidated when passed to services; PATCH omission semantics are preserved.
 
 Internal user creation supplies required phone and precomputed encoded hash;
-public registration still lacks phone and remains deferred. Internal order
+Phase 5 registration collects phone and securely generates its hash. Internal order
 placement supplies buyer/address IDs; OrderCreate's HTTP shape remains unchanged.
 Response mappers use total_amount -> total, product_name -> name, and primary
 ProductImage -> image_url. Direct zero-price storage rows remain incompatible with
 positive-price responses and cannot be ordered through services. Geographic
-eligibility, frontend mock ID/BIGINT handling, and authentication remain unresolved.
+eligibility and frontend mock ID/BIGINT handling remain unresolved.
 
 Order status transitions, address history protection, provisional zero fee, and
 SQLAlchemy transaction boundaries are documented in [SERVICES.md](SERVICES.md).
@@ -102,7 +122,7 @@ must be resolved explicitly before services connect the contracts to storage:
 
 | Contract | Database design / future integration action |
 |---|---|
-| Registration/public user omit phone | `users.phone` is required and unique. Define phone collection and response policy before authentication persistence. |
+| Registration/public user phone | Phase 5 collects required unique phone; PublicUserResponse still omits it. |
 | Order creation/response omit address ID | `orders.address_id` is required. Define address selection and buyer-address ownership validation before order persistence. |
 | Order response uses `total` | Map explicitly from `orders.total_amount`; do not rename the API silently. |
 | Product exposes one optional `image_url` | Storage uses multiple `product_images`. Map the primary image, permitting none, and design upload/storage separately. Frontend data URLs remain mock-only. |
@@ -117,9 +137,9 @@ The two composite foreign keys on `order_items` now enforce matching order/produ
 seller ownership at database level, supplementing service checks.
 `OrderItem.seller_id` is copied from the order; `product_name` and `unit_price` must
 be copied from the product; Phase 4 services implement snapshots and atomic stock
-transactions. There is still no active order HTTP endpoint.
+transactions. Phase 5 activates owned order reads/transitions; creation remains 501.
 
 Services now enforce role rules, buyer-address ownership, nonempty orders, total
 arithmetic, lifecycle transitions, and address history protection. Geographic
-eligibility and authenticated HTTP integration remain deferred. See [DATABASE.md](DATABASE.md)
+eligibility and frontend integration remain deferred. See [DATABASE.md](DATABASE.md)
 for models, indexes, migrations and isolated tests.
