@@ -1,5 +1,6 @@
 export type ProductStatus = 'APPROVED' | 'PENDING' | 'REJECTED';
-export type Category = 'Handmade' | 'Home Decor' | 'Gifts' | 'Fashion' | 'Jewellery' | 'Crafts';
+// Sample catalogue categories only. Real seller API categories live in api/types.ts.
+export type Category = 'Homemade Food' | 'Handmade' | 'Home Decor' | 'Gifts' | 'Fashion' | 'Jewellery' | 'Crafts';
 
 export interface Product {
   id: string; name: string; seller: string; price: number; distance: number; radius: 1 | 2 | 3;

@@ -1,125 +1,129 @@
-# What Not? — Hyperlocal Marketplace Demo
+# What Not?
 
-A polished frontend-only concept demo for a local marketplace connecting buyers with nearby makers, artisans, and small businesses.
+A local marketplace with three business verticals: **Homemade**, **Real Estate**,
+and **Creative Services**. Homemade covers food, handmade products and crafts;
+Real Estate covers rent and sale; Creative Services covers video editing, VFX,
+and editing for travellers and creators.
+
+Phase 6 connects React account, seller product management, moderation, address
+and order-history workflows to the authenticated FastAPI API. Homemade discovery
+and the buyer cart are explicitly labelled samples. Real Estate and Creative
+Services show illustrative coming-soon previews with no operational listing,
+enquiry or booking tools. Real geographic discovery and checkout remain deferred.
+
+[Integration guide](docs/FRONTEND_INTEGRATION.md) | [Phase 6 report](docs/PHASE6_REPORT.md)
+| [Phase 6 scope correction](docs/PHASE6_SCOPE_CORRECTION.md)
+| [Approved Phase 6 checkpoint](docs/PHASE6_CHECKPOINT.md)
 
 ## Run locally
 
-```bash
-corepack pnpm install
-corepack pnpm dev
-```
-
-Open the local URL shown by Vite. Use any non-empty email and password on the buyer, seller, or admin login screens.
-
-## Verify
-
-```bash
-corepack pnpm test -- --run
-corepack pnpm build
-```
-
-## Demo scope
-
-- Buyer discovery, search, category and 1/2/3 KM radius filtering
-- Product details, seller-area eligibility, cart and UI-only checkout
-- Seller dashboard, add/edit/delete listing interactions and approval states
-- Admin metrics, product approval/rejection and commission placeholder
-- WhatsApp contact link for `+91 80800 98882`
-
-Frontend content and state remain mocked in the browser. The standalone backend now provides real authentication, role/ownership authorization, PostgreSQL persistence, and marketplace services. It is not connected to the frontend. Geography, payments, and map integration remain deferred.
-
-## Authentication and authorization (Phase 5)
-
-Public BUYER/SELLER registration hashes passwords with Argon2id; ADMIN registration
-is forbidden. Login issues a short-lived JWT. Protected requests load the active
-user and role from PostgreSQL, then enforce resource ownership through services.
-Seller registration creates only the account; complete shop profiles are created
-separately. Product writes, seller profiles, own addresses/orders, and admin
-moderation are active. Buyer discovery/detail and checkout remain 501 until geography.
-
-See [backend/AUTHENTICATION.md](backend/AUTHENTICATION.md) for setup, required signing
-secret, Bearer tokens, roles, ownership, routes, HTTP errors and Ravi's concrete flow.
-No schema migration or frontend integration was introduced.
-
-## Database-backed services (Phase 4)
-
-User/seller/product/moderation/address/order services now enforce marketplace rules
-through focused SQLAlchemy repositories. Atomic order creation reserves stock with
-PostgreSQL row locks; eligible cancellation/rejection restores inventory once.
-No schema change was needed. Phase 5 activates secure service-backed routes;
-buyer geographic workflows remain 501. Health still works without a configured database.
-The backend's provisional delivery fee is 0.00, independently of the demo's ₹49.
-
-See [backend/SERVICES.md](backend/SERVICES.md) for beginner explanations, operations,
-transaction ownership, order transitions, remaining contract gaps, and isolated
-PostgreSQL tests. No tests access `whatnot_db` or `upsc_compass`.
-
-## Product review workflow
-
-- The seller's **Demo shop** selector switches mock shop identity. Inventory and edit actions belong to the selected shop. It is a demo control, not authentication.
-- New products start `PENDING`. Editing an approved product sends it back to review. Sellers cannot set approval status through add/edit actions.
-- Admin reviews the image, shop, category, description, price, stock and delivery radius. Rejection requires a nonblank reason.
-- Rejected products retain the reason while the seller edits them. **Save Changes** saves the draft; **Resubmit for Review** returns it to `PENDING` and clears the old reason.
-- Deactivation is independent of approval. Reactivation never bypasses review.
-- Discovery, featured listings, buyer detail links, cart additions and checkout require `APPROVED`, active, in-stock products within their delivery radius. Distance remains the existing mock distance.
-- Checkout groups the basket by seller, creates one mock order per shop, snapshots the purchased products, decreases stock and clears the cart. Delivery is ₹49 per seller order, shown before checkout.
-- Product images are previewed locally (JPG/PNG, up to 5 MB). Listings, image previews and orders reset when the page reloads.
-
-Run all tests with `npm.cmd test -- --run` on Windows, check TypeScript with `npx.cmd tsc -b`, and build with `npm.cmd run build`. No lint script or lint configuration is currently installed.
-
-The next phase should establish server geographic eligibility before activating
-buyer discovery and checkout. Frontend integration needs its own plan and contracts.
-
-## Backend foundation (Phase 2)
-
-`backend/app/main.py` creates **What Not? API**, version **0.1.0**. Routes live in `app/api/routes/`, Pydantic request/response contracts in `app/schemas/`, and environment settings in `app/core/config.py`. Tests live in `backend/tests/`.
-
-Use Python 3.10 or newer. From the repository root, open PowerShell and run:
+Use the existing Node/pnpm frontend and Python 3.10+ backend dependencies.
 
 ```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-Copy-Item .env.example .env
+# Repository root: first setup only
+corepack pnpm install
+Copy-Item .env.example .env.local
+# Start React/Vite
+corepack pnpm dev --host 127.0.0.1
+```
+
+The frontend configuration is public `VITE_API_BASE_URL`, defaulting centrally to
+`http://127.0.0.1:8000/api/v1`. Preserve existing environment files. Configure the
+backend separately with a dedicated application database and private signing key,
+following [database setup](backend/DATABASE.md) and
+[authentication setup](backend/AUTHENTICATION.md). No database is provisioned or
+migrated automatically.
+
+```powershell
+# backend directory, after configuration
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The virtual environment keeps backend dependencies separate from your system Python. These commands call its Python directly, so activation and PowerShell execution-policy changes are unnecessary. Copy `.env.example` only during initial setup; preserve any existing `.env` settings. Stop the server with Ctrl+C.
+Use real registered credentials. Public registration offers BUYER and SELLER;
+SELLER must then create a complete shop profile. ADMIN accounts come from the
+existing trusted operator workflow. Workspace selection never grants a role.
 
-For macOS/Linux, use `.venv/bin/python` instead of `.\.venv\Scripts\python.exe`, and `cp .env.example .env` to create the configuration file.
+Tokens remain only in browser memory. A reload/new tab requires login again;
+logout and expiry clear identity, credentials, mounted records and the sample cart.
+See the integration guide for the strategy, examples and security tradeoffs.
 
-- Interactive API docs: http://127.0.0.1:8000/docs
-- OpenAPI contract: http://127.0.0.1:8000/openapi.json
-- Working health check: http://127.0.0.1:8000/api/v1/health
+Default CORS permits only localhost/127.0.0.1 on port 5173. Other development or
+production origins require an explicit `WHAT_NOT_CORS_ORIGINS` JSON list. Production
+requires HTTPS and a configured frontend API URL; no wildcard CORS is used.
 
-Health returns `{"status":"ok","service":"what-not-api"}`. Configure a dedicated
-application database and `WHAT_NOT_JWT_SECRET_KEY` before using authentication or
-protected routes. See the [authentication guide](backend/AUTHENTICATION.md) for active
-routes and the three geographic contracts intentionally remaining 501.
+## Current workflows
 
-Local CORS allows `http://localhost:5173` and `http://127.0.0.1:5173`. If Vite uses a different port, edit `WHAT_NOT_CORS_ORIGINS` in `backend/.env` as a JSON array of exact origins, then restart the server. Environment variables override `.env`. The `.env` file and virtual environment are Git-ignored.
+- Real registration, login, `/auth/me`, logout and role-protected routes.
+- Complete own seller profile creation/update, own products, create/edit, activation,
+  rejection reasons and resubmission. HTTP(S) image URLs are supported; uploads and
+  deletion are not available.
+- Real ADMIN pending queue, approval and rejection with required reason. Fake counts,
+  earnings and commission controls are removed.
+- Own addresses, partial edits and default selection; historical delivery fields
+  remain protected by backend services.
+- BUYER/SELLER owned order history/details and eligible cancellation/progression.
+- Warm Orange design tokens, loading/error/empty states and responsive forms.
+- Existing WhatsApp help destination remains available.
 
-Run backend tests from `backend/`:
+Buyer discovery/detail/cart use sample data with illustrative distances, locations,
+ratings and seller labels. Checkout is disabled. Backend GET products/detail and
+POST orders remain 501; there are no eligibility bypasses, payments or real orders
+from the sample basket. Product/moderation/order lists retain the first-100 backend
+limit. See the guide for edit lookup and pagination limitations.
+
+## Product review and order rules
+
+Products start PENDING. ADMIN approves or rejects pending products; rejection needs
+a reason. Approved edits return to PENDING; rejected edits preserve the reason until
+explicit resubmission. Activation never bypasses review. Product PATCH sends only
+changed fields to preserve untouched inventory; an unchanged save sends no request.
+
+React suggests the existing order transitions for the owning role. FastAPI and
+services remain authoritative for roles, ownership, stock and state transitions.
+Real totals and item snapshots come from the backend. The sample delivery estimate
+is unrelated to the backend's provisional fee.
+
+## Verify
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q
+# Repository root
+node node_modules/vitest/vitest.mjs run --pool=vmThreads --maxWorkers=1
+node node_modules/typescript/bin/tsc -b
+npm run build
+git diff --check
 ```
 
-From the repository root, the frontend checks remain `npm.cmd test -- --run`, `npx.cmd tsc -b`, and `npm.cmd run build`.
+```powershell
+# backend directory: isolated temporary PostgreSQL only
+$env:PATH = 'C:\Program Files\PostgreSQL\17\bin;' + $env:PATH
+.\.venv\Scripts\python.exe -m pytest -q -W error
+.\.venv\Scripts\python.exe -m compileall -q app alembic tests
+.\.venv\Scripts\python.exe -m pip check
+```
 
-API IDs are positive **integers** aligned with PostgreSQL `BIGSERIAL`/`BIGINT`; string IDs and booleans are rejected in JSON bodies. Existing frontend mock/string IDs remain unchanged and must be mapped or refactored when real API integration begins. See [backend API contracts](backend/CONTRACTS.md) for fields, routes, business rules and integration boundaries.
+The full backend suite includes authentication, authorization, persistence, services,
+concurrency and Alembic upgrade/check/downgrade/re-upgrade validation. Tests never use
+`whatnot_db` or `upsc_compass`, and have no protected-database fallback. Do not apply
+migrations to either database. The schema remains the existing revision 0001.
 
-## PostgreSQL persistence foundation (Phase 3)
+The integration guide documents the optional live browser smoke runner with an
+already installed Playwright module/browser. It creates fresh isolated PostgreSQL,
+starts owned localhost servers and checks real workflows plus desktop/tablet/mobile
+layouts. [Screenshots](docs/phase6/screenshots/) contain only temporary test data.
 
-SQLAlchemy 2 typed models now define users, seller profiles, products, images,
-addresses, orders and order items. Alembic revision `0001` owns schema creation;
-application startup never creates tables or connects to a database. Phase 5 uses
-this unchanged schema for authenticated HTTP routes; frontend behavior is unchanged.
+## Backend references
 
-See [backend/DATABASE.md](backend/DATABASE.md) for the relationship diagram,
-constraints/indexes, `DATABASE_URL`, beginner migration workflow, and tests that
-use a separate temporary PostgreSQL cluster. Existing `whatnot_db` and
-`upsc_compass` databases must not be used for migrations or tests. The implementation
-does not provision a development database. Persistence tests require PostgreSQL
-`initdb` and `pg_ctl` on PATH. API/storage mismatches are recorded explicitly in
-[the contract gaps](backend/CONTRACTS.md#phase-3-storage-mappings-and-contract-gaps).
+- [Authentication and authorization](backend/AUTHENTICATION.md)
+- [API contracts](backend/CONTRACTS.md)
+- [Services and business rules](backend/SERVICES.md)
+- [Database and isolated testing](backend/DATABASE.md)
+- [Phase 5 checkpoint](backend/PHASE5_REPORT.md)
+
+API docs: `http://127.0.0.1:8000/docs`; health: `/api/v1/health`. Health does not
+connect to PostgreSQL. Backend JSON IDs are integers; the client preserves them as
+exact decimal strings and uses them in path parameters. Real money remains decimal
+strings. Sample IDs never become fabricated database identities.
+
+Phase 7 should define geographic eligibility and secure discovery/detail/checkout
+contracts, with isolated tests, before activating real buyer purchasing. It has not
+been started.

@@ -1,0 +1,6 @@
+export function Loading() { return <p className="api-loading" role="status">Loading marketplace data...</p>; }
+export function ErrorNotice({ message, retry }: { message:string; retry?:()=>void }) { return <div className="api-error" role="alert"><p>{message}</p>{retry&&<button type="button" className="btn btn-outline btn-sm" onClick={retry}>Try again</button>}</div>; }
+export function Field({ label, name, value, onChange, type='text', required=false, maxLength, min, max, step, error }: { label:string; name:string; value:string|number; onChange:(value:string)=>void; type?:string; required?:boolean; maxLength?:number; min?:number;max?:number;step?:string;error?:string }) {
+  return <label>{label}<input aria-label={label} name={name} value={value} onChange={event=>onChange(event.target.value)} type={type} required={required} maxLength={maxLength} min={min} max={max} step={step} aria-invalid={Boolean(error)} aria-describedby={error?`${name}-error`:undefined}/>{error&&<small id={`${name}-error`}>{error}</small>}</label>;
+}
+export function DemoNotice() { return <div className="development-notice">Sample catalogue: geography and real buyer discovery are not implemented. Distances, ratings, sellers and cart items here are illustrative. Checkout is unavailable.</div>; }

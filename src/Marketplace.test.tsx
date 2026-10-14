@@ -1,136 +1,60 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
-import { DemoProvider } from './state/DemoContext';
+import { setAccessToken } from './api/client';
+const shop={id:2,user_id:1,shop_name:'Ravi Studio',description:null,phone:'1000000001',latitude:'19.000000',longitude:'72.000000',is_verified:false};
+const product={id:3,seller_id:2,name:'Local Candle',description:'Handmade candle',price:'250.00',stock_quantity:2,category:'Crafts',delivery_radius_km:2,image_url:null,status:'REJECTED',rejection_reason:'Improve photo',is_active:true};
+const address={id:4,user_id:1,label:'Home',address_line1:'Maker Lane',address_line2:null,city:'Mumbai',state:'Maharashtra',pincode:'400001',latitude:'19',longitude:'72',is_default:false};
+const order={id:5,buyer_id:1,seller_id:2,status:'PLACED',subtotal:'250.00',delivery_fee:'0.00',total:'250.00',items:[{product_id:3,seller_id:2,name:'Local Candle',quantity:1,unit_price:'250.00'}]};
+function setup(path:string,role:string,handler:(path:string,method:string,body:any)=>[number,unknown]) {
+  setAccessToken('test-token'); const fetcher=vi.fn(async(input:string,options:RequestInit) => { const route=new URL(input).pathname.replace('/api/v1',''); const result=route==='/auth/me' ? [200,{id:1,name:'Ravi',email:'ravi@example.test',role}] : handler(route,options.method || 'GET',options.body ? JSON.parse(String(options.body)):undefined); return new Response(JSON.stringify(result[1]),{status:Number(result[0]),headers:{'Content-Type':'application/json'}}); });
+  vi.stubGlobal('fetch',fetcher); render(<MemoryRouter initialEntries={[path]}><App/></MemoryRouter>); return fetcher;
+}
+afterEach(() => { setAccessToken(null); vi.unstubAllGlobals(); });
+describe('secure seller/admin workflows', () => {
+  it('loads only own products, displays reason and resubmits by backend truth', async () => {
+    let pending=false; const fetcher=setup('/seller','SELLER',(path,method,body) => { if(path==='/sellers/me') return [200,shop]; if(path==='/sellers/me/products') return [200,[{...product,status:pending?'PENDING':'REJECTED',rejection_reason:pending?null:'Improve photo'}]]; expect(path).toBe('/products/3/resubmit'); expect(method).toBe('POST'); expect(body).toBeUndefined(); pending=true; return [200,{}]; });
+    await screen.findByText('Improve photo'); expect(screen.queryByLabelText('Demo shop')).not.toBeInTheDocument(); await userEvent.click(screen.getByRole('button',{name:/resubmit for review/i})); await screen.findByText('Pending',{selector:'.status'}); expect(fetcher.mock.calls.filter(([url])=>String(url).endsWith('/sellers/me/products')).length).toBe(2);
+  });
+  it('toggles activation through API and reloads', async () => { let active=true; setup('/seller','SELLER',(path,method,body) => { if(path==='/sellers/me')return [200,shop]; if(path==='/sellers/me/products')return [200,[{...product,is_active:active}]]; expect(path).toBe('/products/3/activation'); expect(body).toEqual({is_active:false}); active=false; return [200,{}]; }); await screen.findByText('Local Candle'); await userEvent.click(screen.getByRole('button',{name:'Deactivate'})); await screen.findByText('Inactive'); });
+  it('handles no profile truthfully with a setup link', async () => { setup('/seller','SELLER',()=>[404,{}]); await screen.findByText(/Set up your seller profile/i); expect(screen.getByRole('link',{name:/create seller profile/i})).toHaveAttribute('href','/seller/profile'); });
+  it('creates a complete profile without owner or verification fields', async () => { let created=false; setup('/seller/profile','SELLER',(path,method,body) => { if(method==='GET')return [created?200:404,created?shop:{}]; expect(path).toBe('/sellers/me'); expect(method).toBe('POST'); expect(Object.keys(body).sort()).toEqual(['description','latitude','longitude','phone','shop_name']); created=true; return [201,shop]; }); await screen.findByRole('heading',{name:'Create seller profile'}); await userEvent.type(screen.getByLabelText('Shop name'),'Ravi Studio'); await userEvent.type(screen.getByLabelText('Phone'),'1000000001'); await userEvent.type(screen.getByLabelText('Latitude'),'19'); await userEvent.type(screen.getByLabelText('Longitude'),'72'); await userEvent.click(screen.getByRole('button',{name:'Save profile'})); await screen.findByRole('status'); });
+  it('updates an existing profile through PATCH', async () => { let changed=false; setup('/seller/profile','SELLER',(path,method,body)=>{if(method==='GET')return [200,{...shop,shop_name:changed?'Updated Studio':shop.shop_name}]; expect(method).toBe('PATCH'); expect(body.shop_name).toBe('Updated Studio'); changed=true; return [200,shop];}); await screen.findByDisplayValue('Ravi Studio'); await userEvent.clear(screen.getByLabelText('Shop name')); await userEvent.type(screen.getByLabelText('Shop name'),'Updated Studio'); await userEvent.click(screen.getByRole('button',{name:'Save profile'})); await screen.findByDisplayValue('Updated Studio'); });
+  it('creates a product without moderation/actor fields or fake geography', async () => { setup('/seller/products/new','SELLER',(path,method,body) => { if(path==='/sellers/me')return [200,shop]; if(path==='/sellers/me/products')return [200,[]]; expect(path).toBe('/products'); expect(method).toBe('POST'); expect(body.name).toBe('New Candle'); expect(body.price).toBe('250'); expect(body.stock_quantity).toBe(2); expect(body).not.toHaveProperty('seller_id'); expect(body).not.toHaveProperty('status'); return [201,{...product,status:'PENDING'}]; }); await screen.findByLabelText('Product Name'); await userEvent.type(screen.getByLabelText('Product Name'),'New Candle'); await userEvent.type(screen.getByLabelText('Description'),'Handmade candle'); await userEvent.type(screen.getByLabelText('Price (₹)'),'250'); await userEvent.type(screen.getByLabelText('Available Quantity'),'2'); await userEvent.click(screen.getByRole('button',{name:/submit for admin approval/i})); await screen.findByRole('heading',{name:'Your local storefront'}); });
+  it('edits an owned product and preserves rejected review behavior', async () => { setup('/seller/products/3/edit','SELLER',(path,method,body)=>{if(method==='GET')return path==='/sellers/me'?[200,shop]:[200,[product]]; expect(path).toBe('/products/3'); expect(method).toBe('PATCH'); expect(body).toEqual({name:'Updated Candle'}); expect(body).not.toHaveProperty('status');return [200,product];}); await screen.findByDisplayValue('Local Candle'); expect(screen.getByText('Improve photo')).toBeInTheDocument(); await userEvent.clear(screen.getByLabelText('Product Name')); await userEvent.type(screen.getByLabelText('Product Name'),'Updated Candle'); await userEvent.click(screen.getByRole('button',{name:'Save Changes'})); await screen.findByRole('heading',{name:'Your local storefront'}); });
+  it('shows not found for an edit absent from own listing', async () => { setup('/seller/products/999/edit','SELLER',path=>path==='/sellers/me'?[200,shop]:[200,[product]]); await screen.findByText(/listing was not found/i); expect(screen.queryByLabelText('Product Name')).not.toBeInTheDocument(); });
+  it.each(['Approve','Confirm Rejection'])('moderates pending products with real admin authorization: %s', async action => {
+    let done=false; setup('/admin','ADMIN',(path,method,body)=>{if(method==='GET')return [200,done?[]:[{...product,status:'PENDING',rejection_reason:null}]]; expect(path).toBe(`/admin/products/3/${action==='Approve'?'approve':'reject'}`); if(action!=='Approve')expect(body).toEqual({rejection_reason:'Clearer photo needed'}); done=true; return [200,{}]; });
+    await screen.findByText('Local Candle'); if(action!=='Approve'){await userEvent.click(screen.getByRole('button',{name:'Reject'})); await userEvent.click(screen.getByRole('button',{name:action})); expect(screen.getByRole('alert')).toHaveTextContent(/rejection reason/i); await userEvent.type(screen.getByLabelText('Rejection reason'),'Clearer photo needed');} await userEvent.click(screen.getByRole('button',{name:action})); await screen.findByText('Approval queue is clear');
+  });
+  it('shows backend authorization failure with retry', async () => { setup('/admin','ADMIN',()=>[403,{}]); await screen.findByRole('alert'); expect(screen.getByRole('alert')).toHaveTextContent(/permission/i); expect(screen.getByRole('button',{name:'Try again'})).toBeInTheDocument(); });
+});
+describe('addresses and orders', () => {
+  it('lists own addresses and switches default', async () => { let selected=false; setup('/buyer/addresses','BUYER',(path,method,body)=>{if(method==='GET')return [200,[{...address,is_default:selected}]]; expect(path).toBe('/addresses/4/default'); expect(body).toBeUndefined(); selected=true;return [200,{}];}); await screen.findByText('Maker Lane'); await userEvent.click(screen.getByRole('button',{name:'Make default'})); await screen.findByText('Default address'); });
+  it('creates an address without user identity', async () => { let created=false; setup('/buyer/addresses','BUYER',(path,method,body)=>{if(method==='GET')return [200,created?[address]:[]]; expect(path).toBe('/addresses'); expect(body).not.toHaveProperty('user_id'); created=true; return [201,address];}); await screen.findByRole('button',{name:'Add address'}); await userEvent.click(screen.getByRole('button',{name:'Add address'})); for(const [label,value] of [['Label','Home'],['Address line 1','Maker Lane'],['City','Mumbai'],['State','Maharashtra'],['Pincode','400001'],['Latitude','19'],['Longitude','72']])await userEvent.type(screen.getByLabelText(label),value); await userEvent.click(screen.getByRole('button',{name:'Save address'})); await screen.findByText('Maker Lane'); });
+  it.each([403,409])('preserves address edit and reports backend rejection %s', async status => { setup('/buyer/addresses','BUYER',(path,method,body)=>{if(method==='GET')return [200,[address]]; expect(method).toBe('PATCH'); expect(body).toEqual({address_line1:'New lane'});return [status,{}];}); await screen.findByText('Maker Lane'); await userEvent.click(screen.getByRole('button',{name:'Edit address'})); await userEvent.clear(screen.getByLabelText('Address line 1')); await userEvent.type(screen.getByLabelText('Address line 1'),'New lane'); await userEvent.click(screen.getByRole('button',{name:'Save address'})); await screen.findByRole('alert'); expect(screen.getByLabelText('Address line 1')).toHaveValue('New lane'); if(status===409)expect(screen.getByRole('alert')).toHaveTextContent(/replacement address/i); });
+  it.each(['BUYER','SELLER'])('loads own order details and performs supported %s action', async role => { let changed=false; setup(`/${role.toLowerCase()}/orders/5`,role,(path,method,body)=>{if(method==='GET')return [200,{...order,status:changed?(role==='BUYER'?'CANCELLED':'ACCEPTED'):'PLACED'}]; expect(path).toBe('/orders/5/status'); expect(body).toEqual({status:role==='BUYER'?'CANCELLED':'ACCEPTED'}); changed=true; return [200,{}];}); await screen.findByText('Local Candle'); await userEvent.click(screen.getByRole('button',{name:role==='BUYER'?'Cancel order':'Accept order'})); await screen.findByText(role==='BUYER'?'CANCELLED':'ACCEPTED'); });
+  it('retains backend order transition rejection', async () => { setup('/seller/orders/5','SELLER',(path,method)=>method==='GET'?[200,order]:[409,{}]); await screen.findByText('Local Candle'); await userEvent.click(screen.getByRole('button',{name:'Accept order'})); await screen.findByRole('alert'); expect(screen.getByText('PLACED')).toBeInTheDocument(); });
+  it('loads real order history and links to owned detail', async () => { setup('/buyer/orders','BUYER',()=>[200,[order]]); await screen.findByRole('link',{name:'View order 5'}); expect(screen.getByRole('link',{name:'View order 5'})).toHaveAttribute('href','/buyer/orders/5'); });
+  it('labels discovery/cart samples and never activates checkout', async () => { const fetcher=setup('/buyer/products/candles','BUYER',()=>[500,{}]); await screen.findByRole('button',{name:/add to cart/i}); await userEvent.click(screen.getByRole('button',{name:/add to cart/i})); await userEvent.click(screen.getByRole('link',{name:/view cart/i})); expect(screen.getByRole('button',{name:/checkout unavailable/i})).toBeDisabled(); expect(fetcher.mock.calls).toHaveLength(1); expect(screen.getByText(/sample catalogue.*geography/i)).toBeInTheDocument(); });
+});
 
-function open(path: string) { return render(<MemoryRouter initialEntries={[path]}><DemoProvider><App /></DemoProvider></MemoryRouter>); }
-
-describe('moderation and purchase UI', () => {
-  it('removes an inactive product from landing promotions as well as discovery', async () => {
-    const user = userEvent.setup();
-    open('/seller');
-    await user.selectOptions(screen.getByLabelText('Demo shop'), 'Glow Local Co.');
-    await user.click(screen.getByRole('button', { name: /deactivate/i }));
-    await user.click(screen.getByRole('link', { name: /back to marketplace/i }));
-    expect(screen.queryByText('Handmade Candle Set')).not.toBeInTheDocument();
+describe('integration edge cases',()=>{
+  it('clears an image explicitly without changing inventory',async()=>{
+    let cleared=false;setup('/seller/products/3/edit','SELLER',(path,method,body)=>{if(method==='GET')return path==='/sellers/me'?[200,shop]:[200,[{...product,image_url:cleared?null:'https://example.com/candle.png'}]];expect(body).toEqual({image_url:null});cleared=true;return [200,product];});await screen.findByDisplayValue('https://example.com/candle.png');await userEvent.clear(screen.getByLabelText('Image URL (HTTP or HTTPS)'));await userEvent.click(screen.getByRole('button',{name:'Save Changes'}));await screen.findByRole('heading',{name:'Your local storefront'});
   });
-  it('keeps an empty demo shop selectable after its final listing is deleted', async () => {
-    const user = userEvent.setup();
-    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    try {
-      open('/seller');
-      await user.selectOptions(screen.getByLabelText('Demo shop'), 'Glow Local Co.');
-      await user.click(screen.getByRole('button', { name: /delete handmade candle set/i }));
-      expect(screen.getByText('Your shop has no products yet')).toBeInTheDocument();
-      await user.selectOptions(screen.getByLabelText('Demo shop'), 'Mitti & Thread Studio');
-      expect(screen.getByRole('option', { name: 'Glow Local Co.' })).toBeInTheDocument();
-      await user.selectOptions(screen.getByLabelText('Demo shop'), 'Glow Local Co.');
-      await user.click(screen.getByRole('link', { name: /add new product/i }));
-      expect(screen.getByRole('heading', { name: 'Add New Product' })).toBeInTheDocument();
-    } finally { confirmation.mockRestore(); }
+  it('avoids submitting an unchanged approved product for moderation',async()=>{
+    const fetcher=setup('/seller/products/3/edit','SELLER',path=>path==='/sellers/me'?[200,shop]:[200,[{...product,status:'APPROVED',rejection_reason:null}]]);await screen.findByDisplayValue('Local Candle');await userEvent.click(screen.getByRole('button',{name:'Submit for Admin Approval'}));await screen.findByText('No product changes to save.');expect(fetcher.mock.calls.every(([,options])=>options.method==='GET')).toBe(true);
   });
-  it('starts with a blank form when navigating directly from editing to adding', async () => {
-    open('/seller/products/teddy/edit');
-    expect(screen.getByLabelText('Product Name')).toHaveValue('Handmade Teddy Bear');
-    await userEvent.click(screen.getByRole('link', { name: /^add product$/i }));
-    expect(screen.getByLabelText('Product Name')).toHaveValue('');
-    expect(screen.getByLabelText('Available Quantity')).toHaveValue(null);
+  it('updates a historical address label without resending delivery fields',async()=>{
+    let renamed=false;setup('/buyer/addresses','BUYER',(path,method,body)=>{if(method==='GET')return [200,[{...address,label:renamed?'Office':address.label}]];expect(body).toEqual({label:'Office'});renamed=true;return [200,address];});await screen.findByText('Maker Lane');await userEvent.click(screen.getByRole('button',{name:'Edit address'}));await userEvent.clear(screen.getByLabelText('Label'));await userEvent.type(screen.getByLabelText('Label'),'Office');await userEvent.click(screen.getByRole('button',{name:'Save address'}));await screen.findByRole('heading',{name:'Office'});
   });
-  it('previews a locally selected product image', async () => {
-    open('/seller/products/new');
-    const file = new File(['local image'], 'product.png', { type: 'image/png' });
-    await userEvent.upload(screen.getByLabelText('Choose product image'), file);
-    await screen.findByAltText('Product preview');
-    await vi.waitFor(() => expect(screen.getByAltText('Product preview').getAttribute('src')).toMatch(/^data:image\/png;base64,/));
+  it('separates accepted moderation from a failed refresh',async()=>{
+    let accepted=false;setup('/admin','ADMIN',(path,method)=>{if(method==='GET')return accepted?[503,{}]:[200,[{...product,status:'PENDING',rejection_reason:null}]];accepted=true;return [200,{}];});await screen.findByText('Local Candle');await userEvent.click(screen.getByRole('button',{name:'Approve'}));await screen.findByRole('alert');expect(screen.getByRole('status')).toHaveTextContent(/Moderation saved.*Refresh/i);expect(screen.getByRole('button',{name:'Try again'})).toBeInTheDocument();expect(screen.queryByText('Local Candle')).not.toBeInTheDocument();
   });
-  it('creates a pending listing, lets the admin approve it, and then shows it to buyers', async () => {
-    const user = userEvent.setup();
-    open('/seller/products/new');
-    await user.type(screen.getByLabelText('Product Name'), 'Local Cotton Scarf');
-    await user.type(screen.getByLabelText('Description'), 'Handwoven cotton scarf from our studio.');
-    await user.type(screen.getByLabelText('Price (₹)'), '250');
-    await user.type(screen.getByLabelText('Available Quantity'), '2');
-    await user.click(screen.getByRole('button', { name: /submit for admin approval/i }));
-    expect(screen.getByRole('status')).toHaveTextContent(/submitted for admin review/i);
-    expect(screen.getByText('Pending', { selector: '.status' })).toBeInTheDocument();
-    await user.click(screen.getByRole('link', { name: /back to marketplace/i }));
-    await user.click(screen.getByRole('link', { name: /^login$/i }));
-    await user.click(screen.getByRole('link', { name: /continue as admin/i }));
-    await user.type(screen.getByLabelText(/email/i), 'admin@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'demo');
-    await user.click(screen.getByRole('button', { name: /enter admin demo/i }));
-    const listing = screen.getByText('Local Cotton Scarf').closest('article')!;
-    expect(within(listing).getByText('Seller: Mitti & Thread Studio')).toBeInTheDocument();
-    await user.click(within(listing).getByRole('button', { name: /approve/i }));
-    expect(screen.getByRole('status')).toHaveTextContent(/approved/i);
-    await user.click(screen.getByRole('link', { name: /back to marketplace/i }));
-    await user.click(screen.getByRole('link', { name: /explore nearby/i }));
-    expect(screen.getByText('Local Cotton Scarf')).toBeInTheDocument();
-  }, 20000);
-  it('requires a rejection reason and shows it to the selected seller before resubmission', async () => {
-    const user = userEvent.setup();
-    open('/admin');
-    expect(screen.getByText(/Lightweight hammered brass/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^reject$/i }));
-    await user.click(screen.getByRole('button', { name: /confirm rejection/i }));
-    expect(screen.getByText(/enter a rejection reason/i)).toBeInTheDocument();
-    await user.type(screen.getByLabelText(/rejection reason/i), 'Please use a clearer photo');
-    await user.click(screen.getByRole('button', { name: /confirm rejection/i }));
-    expect(screen.getByRole('status')).toHaveTextContent(/rejected/i);
-    await user.click(screen.getByRole('link', { name: /back to marketplace/i }));
-    await user.click(screen.getByRole('link', { name: /start selling/i }));
-    await user.type(screen.getByLabelText(/email/i), 'seller@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'demo');
-    await user.click(screen.getByRole('button', { name: /enter seller demo/i }));
-    await user.selectOptions(screen.getByLabelText(/demo shop/i), 'Aarika Jewellery');
-    expect(screen.getByText('Please use a clearer photo')).toBeInTheDocument();
-    expect(screen.queryByText('Handmade Teddy Bear')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('link', { name: /edit brass moon earrings/i }));
-    expect(screen.getByText('Please use a clearer photo')).toBeInTheDocument();
-    const description = screen.getByLabelText('Description');
-    await user.clear(description);
-    await user.type(description, 'Updated description with clear materials and finish.');
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
-    expect(screen.getByText('Rejected', { selector: '.status' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /resubmit for review/i }));
-    expect(screen.queryByText('Please use a clearer photo')).not.toBeInTheDocument();
-    expect(screen.getByText('Pending', { selector: '.status' })).toBeInTheDocument();
-  }, 20000);
-  it('hides pending listings on direct buyer URLs', () => {
-    open('/buyer/products/earrings');
-    expect(screen.queryByRole('heading', { name: 'Brass Moon Earrings' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /add to cart/i })).not.toBeInTheDocument();
-  });
-  it('hides rejected listings on direct buyer URLs', () => {
-    open('/buyer/products/basket');
-    expect(screen.queryByRole('heading', { name: 'Palm Leaf Basket' })).not.toBeInTheDocument();
-  });
-  it('blocks editing another demo shop', () => {
-    open('/seller/products/candles/edit');
-    expect(screen.getByText(/listing was not found/i)).toBeInTheDocument();
-  });
-  it('lets a seller deactivate and reactivate their listing', async () => {
-    open('/seller');
-    await userEvent.click(screen.getByRole('button', { name: /deactivate/i }));
-    expect(screen.getByText('Inactive', { selector: '.status' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /reactivate/i }));
-    expect(screen.queryByText('Inactive', { selector: '.status' })).not.toBeInTheDocument();
-  });
-  it('creates and displays separate seller orders at checkout', async () => {
-    const user = userEvent.setup();
-    open('/buyer/products/teddy');
-    await user.click(screen.getByRole('button', { name: /add to cart/i }));
-    await user.click(screen.getByRole('link', { name: /back to nearby finds/i }));
-    const candleCard = screen.getByText('Handmade Candle Set').closest('article')!;
-    await user.click(within(candleCard).getByRole('link', { name: /view product/i }));
-    await user.click(screen.getByRole('button', { name: /add to cart/i }));
-    await user.click(screen.getByRole('link', { name: /view cart/i }));
-    expect(screen.getByText(/2 separate seller orders/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /proceed to checkout/i }));
-    expect(screen.getByRole('heading', { name: /demo orders placed/i })).toBeInTheDocument();
-    expect(screen.getAllByText(/order total/i)).toHaveLength(2);
-    expect(screen.queryByRole('button', { name: /proceed to checkout/i })).not.toBeInTheDocument();
+  it.each([['PLACED','Reject order','REJECTED'],['ACCEPTED','Start preparing','PREPARING'],['PREPARING','Out for delivery','OUT_FOR_DELIVERY'],['OUT_FOR_DELIVERY','Mark delivered','DELIVERED']])('suggests a supported %s seller transition',async(status,label,next)=>{
+    let changed=false;setup('/seller/orders/5','SELLER',(path,method,body)=>{if(method==='GET')return [200,{...order,status:changed?next:status}];expect(body).toEqual({status:next});changed=true;return [200,{}];});await screen.findByText('Local Candle');await userEvent.click(screen.getByRole('button',{name:label}));await screen.findByText(next);
   });
 });
