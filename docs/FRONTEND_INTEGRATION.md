@@ -1,4 +1,9 @@
-# React and FastAPI integration (Phase 6)
+# React and FastAPI integration
+
+Phase 7 current location behavior is documented in [PHASE7_LOCATION.md](PHASE7_LOCATION.md).
+It supersedes the Phase 6 sample-discovery/geography limitations below. Real nearby
+routes use explicit buyer choices and confirmed seller dispatch; the separate
+samples/cart remain demonstrations. The following sections preserve Phase 6 details.
 
 The account, seller, moderation, address and order-history screens now communicate
 with the real backend. The public catalogue and buyer cart remain labelled sample

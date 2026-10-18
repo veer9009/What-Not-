@@ -5,11 +5,13 @@ and **Creative Services**. Homemade covers food, handmade products and crafts;
 Real Estate covers rent and sale; Creative Services covers video editing, VFX,
 and editing for travellers and creators.
 
-Phase 6 connects React account, seller product management, moderation, address
-and order-history workflows to the authenticated FastAPI API. Homemade discovery
-and the buyer cart are explicitly labelled samples. Real Estate and Creative
-Services show illustrative coming-soon previews with no operational listing,
-enquiry or booking tools. Real geographic discovery and checkout remain deferred.
+Phase 7 adds real Homemade nearby discovery to the authenticated Phase 1–6 workflows.
+Sellers explicitly confirm their business/dispatch point; buyers choose an owned
+address or a temporary manual/device point. The backend enforces product delivery
+radii. Real Estate and Creative Services remain Coming Soon. Checkout and payments
+remain unavailable. Public examples and the separate sample basket stay illustrative.
+
+[Phase 7 location guide](docs/PHASE7_LOCATION.md) | [Phase 7 report](docs/PHASE7_REPORT.md)
 
 [Integration guide](docs/FRONTEND_INTEGRATION.md) | [Phase 6 report](docs/PHASE6_REPORT.md)
 | [Phase 6 scope correction](docs/PHASE6_SCOPE_CORRECTION.md)
@@ -65,11 +67,12 @@ requires HTTPS and a configured frontend API URL; no wildcard CORS is used.
 - Warm Orange design tokens, loading/error/empty states and responsive forms.
 - Existing WhatsApp help destination remains available.
 
-Buyer discovery/detail/cart use sample data with illustrative distances, locations,
-ratings and seller labels. Checkout is disabled. Backend GET products/detail and
-POST orders remain 501; there are no eligibility bypasses, payments or real orders
-from the sample basket. Product/moderation/order lists retain the first-100 backend
-limit. See the guide for edit lookup and pagination limitations.
+Buyer discovery/detail now use POST /discovery/products with an explicitly chosen
+location. Eligible products require approval, activity, stock and the seller's radius.
+The public examples and /buyer/samples catalogue/cart remain illustrative. Legacy
+GET products/detail and POST orders remain 501; checkout is disabled. Seller,
+moderation and order lists retain the first-100 backend limit; discovery applies
+eligibility before pagination. See the location guide for current limitations.
 
 ## Product review and order rules
 
@@ -104,12 +107,13 @@ $env:PATH = 'C:\Program Files\PostgreSQL\17\bin;' + $env:PATH
 The full backend suite includes authentication, authorization, persistence, services,
 concurrency and Alembic upgrade/check/downgrade/re-upgrade validation. Tests never use
 `whatnot_db` or `upsc_compass`, and have no protected-database fallback. Do not apply
-migrations to either database. The schema remains the existing revision 0001.
+migrations to either database. Revision 0002 adds nullable dispatch confirmation;
+existing coordinate and radius fields are reused.
 
-The integration guide documents the optional live browser smoke runner with an
-already installed Playwright module/browser. It creates fresh isolated PostgreSQL,
-starts owned localhost servers and checks real workflows plus desktop/tablet/mobile
-layouts. [Screenshots](docs/phase6/screenshots/) contain only temporary test data.
+The location guide documents scripts/phase7_smoke.py, which uses installed Chrome
+and Node 24's native WebSocket with no new dependency. It creates isolated PostgreSQL,
+owned localhost servers and a temporary browser profile, then checks real location
+workflows and responsive widths. Existing Phase 6 screenshots remain historical.
 
 ## Backend references
 
@@ -124,6 +128,6 @@ connect to PostgreSQL. Backend JSON IDs are integers; the client preserves them 
 exact decimal strings and uses them in path parameters. Real money remains decimal
 strings. Sample IDs never become fabricated database identities.
 
-Phase 7 should define geographic eligibility and secure discovery/detail/checkout
-contracts, with isolated tests, before activating real buyer purchasing. It has not
-been started.
+Manual coordinates are a Phase 7 technical fallback. A friendlier PIN/address search
+or map picker is a future enhancement; no geocoding provider or map infrastructure
+is included. Real purchasing requires a future checkout design and remains disabled.

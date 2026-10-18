@@ -1,4 +1,6 @@
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
+from app.schemas.location import Coordinate
 
 from app.models import SellerProfile
 from app.repositories.sellers import SellerRepository
@@ -51,8 +53,24 @@ class SellerService:
         require_user(self.session, actor_id, lock=True)
         owned_seller(self.session, actor_id, seller_id)
         seller = self.repository.get(seller_id, lock=True)
+        if any(key in {'latitude', 'longitude'} and getattr(seller, key) != value
+               for key, value in data.model_dump(exclude_unset=True).items()):
+            seller.dispatch_location_confirmed_at = None
         for key, value in data.model_dump(exclude_unset=True).items():
             setattr(seller, key, value)
+        return seller
+
+    @write_operation
+    def set_dispatch_location(self, actor_id: int, data: Coordinate):
+        data = Coordinate.model_validate(data)
+        require_user(self.session, actor_id, role='SELLER', lock=True)
+        profile = self.repository.by_user(actor_id)
+        if profile is None:
+            raise SellerNotFound('Seller profile does not exist')
+        seller = self.repository.get(profile.id, lock=True)
+        seller.latitude = data.latitude
+        seller.longitude = data.longitude
+        seller.dispatch_location_confirmed_at = datetime.now(timezone.utc)
         return seller
 
     def list_products(self, actor_id: int, seller_id: int, *, offset=0, limit=100):

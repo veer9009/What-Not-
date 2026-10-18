@@ -1,5 +1,14 @@
 # What Not? PostgreSQL foundation — Phase 3
 
+Phase 7 current schema revision is **0002**: a nullable timezone-aware
+seller_profiles.dispatch_location_confirmed_at, without default/backfill. Existing
+NUMERIC(9,6) coordinates and radius constraints are reused. Legacy rows remain
+unconfirmed; no coordinates are rewritten. Downgrade to 0001 removes only the new
+column; re-upgrade requires explicit confirmation again. Migration round trips,
+data preservation and ORM comparison run only in verified disposable PostgreSQL.
+No application database was migrated. See [Phase 7 guide](../docs/PHASE7_LOCATION.md).
+The original Phase 3 foundation and Phase 4/5 history below remain as references.
+
 Phase 4 now implements repositories, business services, and a lazy request-session
 dependency on this unchanged schema. Phase 5 activates authenticated routes; health
 remains independent of PostgreSQL. See [SERVICES.md](SERVICES.md) for current

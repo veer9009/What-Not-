@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 // Presentation only: these examples are not product records or API payloads.
-export function ExploreVerticals() {
+export function ExploreVerticals({live=false}:{live?:boolean}) {
   const location = useLocation();
   useEffect(() => {
     if (location.hash === '#homemade-catalogue') {
@@ -18,12 +18,12 @@ export function ExploreVerticals() {
     </div></div>
     <div className="vertical-grid">
       <article className="vertical-card" id="homemade" aria-labelledby="homemade-heading">
-        <div className="vertical-card-top"><Utensils size={28} aria-hidden="true"/><span className="scope-badge">Sample catalogue</span></div>
+        <div className="vertical-card-top"><Utensils size={28} aria-hidden="true"/><span className="scope-badge">{live?'Nearby products':'Sample catalogue'}</span></div>
         <h3 id="homemade-heading">Homemade</h3>
         <p>Discover homemade food, handmade products and local creations.</p>
         <ul className="vertical-examples"><li>Homemade Food</li><li>Homemade Products / Crafts</li></ul>
-        <p className="vertical-limit">Food and crafts discovery is a sample preview. Food-specific availability, delivery and compliance tools are coming soon.</p>
-        <Link className="text-link vertical-action" to="/buyer#homemade-catalogue">Explore Homemade samples <ArrowRight size={16}/></Link>
+        <p className="vertical-limit">{live?'Choose your location to discover eligible handmade products. Food-specific listing and compliance tools are coming soon.':'Food and crafts discovery is a sample preview. Food-specific availability, delivery and compliance tools are coming soon.'}</p>
+        <Link className="text-link vertical-action" to={live?'/buyer#homemade-catalogue':'/buyer/samples#homemade-catalogue'}>{live?'Explore nearby Homemade':'Explore Homemade samples'} <ArrowRight size={16}/></Link>
       </article>
       <article className="vertical-card" id="real-estate" aria-labelledby="real-estate-heading">
         <div className="vertical-card-top"><House size={28} aria-hidden="true"/><span className="scope-badge">Coming soon</span></div>

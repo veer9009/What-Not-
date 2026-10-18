@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Numeric, String, Text, false
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Numeric, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, IdMixin, TimestampMixin
 
@@ -25,6 +26,7 @@ class SellerProfile(IdMixin, TimestampMixin, Base):
     phone: Mapped[str] = mapped_column(String(32))
     latitude: Mapped[Decimal] = mapped_column(Numeric(9, 6))
     longitude: Mapped[Decimal] = mapped_column(Numeric(9, 6))
+    dispatch_location_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_verified: Mapped[bool] = mapped_column(server_default=false())
     user: Mapped[User] = relationship(back_populates="seller_profile")
     products: Mapped[list[Product]] = relationship(back_populates="seller", passive_deletes="all")

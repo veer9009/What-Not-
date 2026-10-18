@@ -4,7 +4,7 @@ from threading import Lock
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, auth, health, orders, products, addresses, sellers
+from app.api.routes import admin, auth, health, orders, products, addresses, sellers, discovery
 from app.api.errors import install_error_handlers
 from app.core.config import Settings
 
@@ -23,7 +23,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application = FastAPI(
         title="What Not? API", version="0.1.0",
-        description="Phase 5 authentication and ownership-protected marketplace operations. Buyer discovery and checkout await geography.",
+        description="Authenticated marketplace operations and explicit-location hyperlocal discovery. Checkout remains unavailable.",
         lifespan=lifespan,
     )
     application.state.settings = settings
@@ -35,7 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization"],
     )
-    for router in (health.router, auth.router, products.router, orders.router, admin.router, addresses.router, sellers.router):
+    for router in (health.router, auth.router, products.router, orders.router, admin.router, addresses.router, sellers.router, discovery.router):
         application.include_router(router, prefix="/api/v1")
     return application
 

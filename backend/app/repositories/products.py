@@ -1,7 +1,7 @@
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, joinedload
 
-from app.models import Product
+from app.models import Product, SellerProfile, User
 from app.repositories.validation import database_id
 
 
@@ -36,3 +36,18 @@ class ProductRepository:
     def add(self, product: Product):
         self.session.add(product)
         return product
+
+    def _discovery_query(self):
+        return (select(Product).join(Product.seller).join(SellerProfile.user)
+                .where(Product.status == 'APPROVED', Product.is_active.is_(True),
+                       Product.stock_quantity > 0, SellerProfile.dispatch_location_confirmed_at.is_not(None),
+                       User.is_active.is_(True), User.role == 'SELLER')
+                .options(selectinload(Product.images), joinedload(Product.seller))
+                .execution_options(populate_existing=True))
+
+    def discovery_candidates(self, after_id: int, limit: int = 100):
+        return list(self.session.scalars(self._discovery_query()
+                    .where(Product.id > after_id).order_by(Product.id).limit(limit)))
+
+    def eligible_detail(self, product_id: int):
+        return self.session.scalar(self._discovery_query().where(Product.id == database_id(product_id)))

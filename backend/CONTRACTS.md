@@ -1,8 +1,9 @@
-# What Not? API contracts — Phase 2
+# What Not? API contracts
 
-Phase 5 implements authentication and selected role/ownership-protected HTTP routes
-using Phase 4 services. Buyer discovery/detail and checkout remain **501** because
-geographic eligibility is absent. No frontend integration or payment processing.
+Phase 7 adds explicit-location discovery and seller dispatch confirmation. The
+[current location contracts](../docs/PHASE7_LOCATION.md) specify the request/response,
+privacy and boundary rules. Legacy GET product contracts and checkout remain 501.
+The Phase 2–5 sections below retain historical context where explicitly labelled.
 See [AUTHENTICATION.md](AUTHENTICATION.md) for current routes, configuration and
 security behavior, and [SERVICES.md](SERVICES.md) for business rules.
 
@@ -46,7 +47,7 @@ Rules implemented by Phase 4 services and selected authenticated Phase 5 routes:
 - Editing an approved product → PENDING, clearing any old rejection reason.
 - Editing a rejected product retains REJECTED and its reason until explicit resubmission → PENDING, clearing that reason.
 - Activation is independent of review. Reactivation cannot grant approval.
-- Buyer listing, detail and checkout eligibility require APPROVED + active + stock_quantity > 0 + buyer within delivery_radius_km. No buyer coordinates or server-calculated distance are available yet.
+- Buyer listing, detail and checkout eligibility require APPROVED + active + stock_quantity > 0 + buyer within delivery_radius_km. Phase 7 discovery implements these rules; checkout remains disabled.
 
 ## Order contracts
 
@@ -71,7 +72,7 @@ All paths have the `/api/v1` prefix.
 | POST | /auth/register | 201 BUYER/SELLER user only |
 | POST | /auth/login | 200 JWT and safe user |
 | GET | /auth/me | Active authenticated user |
-| GET | /products; /products/{product_id} | 501 geographic contracts |
+| GET | /products; /products/{product_id} | 501 legacy contracts; use discovery POST |
 | POST | /products | SELLER, own profile; 201 PENDING product |
 | PATCH | /products/{product_id}; /products/{product_id}/activation | SELLER, owned product |
 | POST | /products/{product_id}/resubmit | SELLER, owned rejected product |
@@ -82,6 +83,9 @@ All paths have the `/api/v1` prefix.
 | POST | /admin/products/{product_id}/approve; /reject | Active database ADMIN |
 | GET, POST, PATCH | /sellers/me | SELLER, own complete profile |
 | GET | /sellers/me/products | SELLER, own listings |
+| PATCH | /sellers/me/dispatch-location | SELLER, confirm own business point |
+| POST | /discovery/products | BUYER, explicit transient point or owned address; eligible list |
+| POST | /discovery/products/{product_id} | BUYER, eligible detail or generic 404 |
 | GET, POST | /addresses | Active user, own addresses |
 | GET, PATCH | /addresses/{address_id} | Active user, owned address |
 | POST | /addresses/{address_id}/default | Active user, owned default switch |

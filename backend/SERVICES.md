@@ -1,5 +1,13 @@
 # What Not? database services — Phase 4
 
+Phase 7 adds [location/discovery services](../docs/PHASE7_LOCATION.md), which
+supersede the geographic deferrals below. DiscoveryService owns current active
+BUYER/address validation, Haversine eligibility and buyer-safe views. SellerService
+confirms dispatch under the existing explicit transaction/savepoint and row locks;
+generic changed-coordinate edits clear confirmation. Repositories never commit.
+The existing order services and disabled public checkout are unchanged. Remaining
+Phase 4 sections preserve the original behavior and historical implementation notes.
+
 Database-backed marketplace operations are exposed through selected authenticated
 Phase 5 routes. Buyer geographic workflows remain **501**.
 Health remains **200**, needs no database, and does not check database readiness.

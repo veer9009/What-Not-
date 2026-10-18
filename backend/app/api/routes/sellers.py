@@ -6,8 +6,15 @@ from app.schemas.product import ProductResponse
 from app.services.inputs import SellerCreate, SellerUpdate
 from app.services.sellers import SellerService
 from app.services.mappers import product_response
+from app.schemas.location import Coordinate
 
 router = APIRouter(prefix='/sellers', tags=['Sellers'])
+
+
+@router.patch('/me/dispatch-location', response_model=SellerResponse,
+              description='Explicitly confirm or update the authenticated seller business/dispatch location.')
+def set_dispatch_location(payload: Coordinate, user: Seller, session: TransactionSession):
+    return seller_response(SellerService(session).set_dispatch_location(user.id, payload))
 
 
 @router.post('/me', response_model=SellerResponse, status_code=201, description='Create a complete profile for the authenticated SELLER.')

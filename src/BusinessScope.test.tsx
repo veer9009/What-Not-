@@ -33,7 +33,7 @@ describe('What Not? business scope', () => {
       expect(within(explore).getByRole('heading', { name })).toBeInTheDocument();
       expect(within(explore).getByText(description)).toBeInTheDocument();
     }
-    expect(within(explore).getByRole('link', { name: 'Explore Homemade samples' })).toHaveAttribute('href', '/buyer#homemade-catalogue');
+    expect(within(explore).getByRole('link', { name: path === '/buyer' ? 'Explore nearby Homemade' : 'Explore Homemade samples' })).toHaveAttribute('href', path === '/buyer' ? '/buyer#homemade-catalogue' : '/buyer/samples#homemade-catalogue');
   });
 
   it('keeps property and creative previews separate from product commerce', () => {
@@ -80,15 +80,15 @@ describe('What Not? business scope', () => {
 
   it('scrolls to the Homemade catalogue when its buyer card is selected', async () => {
     open('/buyer', 'BUYER');
-    const catalogue = await screen.findByRole('region', { name: 'Homemade samples' });
+    const catalogue = await screen.findByRole('region', { name: 'Nearby Homemade products' });
     const scroll = vi.fn();
     catalogue.scrollIntoView = scroll;
-    await userEvent.click(screen.getByRole('link', { name: 'Explore Homemade samples' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Explore nearby Homemade' }));
     expect(scroll).toHaveBeenCalledWith({ block: 'start' });
   });
 
   it('offers food and crafts samples without property/service products or backend discovery', async () => {
-    const fetcher = open('/buyer', 'BUYER');
+    const fetcher = open('/buyer/samples', 'BUYER');
     await screen.findByRole('heading', { name: 'Homemade samples' });
     await userEvent.click(screen.getByRole('button', { name: 'Homemade Food' }));
     expect(screen.getByRole('heading', { name: 'Homemade Laddus' })).toBeInTheDocument();

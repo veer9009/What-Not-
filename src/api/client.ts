@@ -36,18 +36,18 @@ export function identifier(id: string) {
   if (!/^[1-9]\d*$/.test(id) || BigInt(id) > 9223372036854775807n) throw new ApiError(404, messages[404]);
   return id;
 }
-interface Options { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; auth?: boolean; signal?: AbortSignal }
-export async function api<T>(path: string, { method = 'GET', body, auth = true, signal }: Options = {}): Promise<T> {
+interface Options { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; bodyText?: string; auth?: boolean; signal?: AbortSignal }
+export async function api<T>(path: string, { method = 'GET', body, bodyText, auth = true, signal }: Options = {}): Promise<T> {
   const base = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
   const headers = new Headers({ Accept: 'application/json' });
-  if (body !== undefined) headers.set('Content-Type', 'application/json');
+  if (body !== undefined || bodyText !== undefined) headers.set('Content-Type', 'application/json');
   const token = auth ? credential : null;
   const started = generation;
   if (token) headers.set('Authorization', `Bearer ${token}`);
   let response: Response;
   let raw: string;
   try {
-    response = await fetch(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal, cache: 'no-store', credentials: 'omit' });
+    response = await fetch(`${base}${path}`, { method, headers, body: bodyText ?? (body === undefined ? undefined : JSON.stringify(body)), signal, cache: 'no-store', credentials: 'omit' });
     raw = await response.text();
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
