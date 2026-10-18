@@ -7,15 +7,25 @@ import { ApiError, errorMessage } from '../api/client';
 import { roleHome, useAuth } from '../state/AuthContext';
 import { useMounted } from '../state/useMounted';
 import type { Registration } from '../api/types';
-const roles=['buyer','seller','admin'];
-export function RoleSelectionPage(){return <div className="login-page"><div className="login-brand"><Logo/><Link to="/">Back home</Link></div><div className="role-panel"><h1>How would you like to continue?</h1><p>Sign in with your marketplace account. Your account determines your workspace.</p><div className="role-grid">{roles.map(role=><Link className="role-card clay" to={`/login/${role}`} key={role}><h2>{role[0].toUpperCase()+role.slice(1)}</h2><span>Continue as {role}</span></Link>)}</div><Link className="text-link" to="/register">Create a buyer or seller account</Link></div></div>}
-export function LoginPage(){
+const roles=['buyer','seller'];
+export function RoleSelectionPage(){return <div className="login-page"><div className="login-brand"><Logo/><Link to="/">Back home</Link></div><div className="role-panel"><h1>How would you like to continue?</h1><p>Sign in with your marketplace account. Your account determines your workspace.</p><div className="role-grid public-role-grid">{roles.map(role=><Link className="role-card clay" to={`/login/${role}`} key={role}><h2>{role[0].toUpperCase()+role.slice(1)}</h2><span>Continue as {role}</span></Link>)}</div><Link className="text-link" to="/register">Create a buyer or seller account</Link></div></div>}
+export function LoginPage({administration=false}:{administration?:boolean}){
   const {role}=useParams();const nav=useNavigate();const auth=useAuth();const mounted=useMounted();
   const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [error,setError]=useState('');const [fields,setFields]=useState<Record<string,string>>({});const [busy,setBusy]=useState(false);
-  if(!role||!roles.includes(role))return <Navigate to="/login" replace/>;
+  if(!administration&&(!role||!roles.includes(role)))return <Navigate to="/login" replace/>;
   if(auth.user)return <Navigate to={roleHome(auth.user.role)} replace/>;
   async function submit(event:FormEvent){event.preventDefault();if(busy)return;if(!email.trim()||!password){setError('Enter your email and password to continue.');return;}setBusy(true);setError('');setFields({});try{const current=await auth.login(email,password);if(mounted.current)nav(roleHome(current.role),{replace:true});}catch(reason){setError(errorMessage(reason));if(reason instanceof ApiError)setFields(reason.fields);}finally{setPassword('');setBusy(false);}}
-  return <div className="login-split clay"><div className="login-aside"><Logo/><div><p className="eyebrow">Your neighbourhood marketplace</p><h1>Welcome to What Not?</h1><p>Connect with local makers. Sign in to manage your account.</p></div></div><div className="login-form-wrap"><Link to="/login">Back to workspace selection</Link><form onSubmit={submit} noValidate><h2>Welcome back</h2><p>Use your registered email and password.</p><Field label="Email address" name="email" type="email" value={email} onChange={setEmail} maxLength={320} error={fields.email}/><Field label="Password" name="password" type="password" value={password} onChange={setPassword} maxLength={128} error={fields.password}/>{(error||auth.error)&&<ErrorNotice message={error||auth.error}/>}<button className="btn btn-primary wide" disabled={busy}>{busy?'Signing in...':'Sign in'}</button><p><Link className="text-link" to="/register">Create account</Link></p><small>Sessions expire automatically. Reloading this page requires signing in again.</small></form></div></div>;
+  const loginForm = <form onSubmit={submit} noValidate>
+    {administration?<><h1>What Not? Administration</h1><p>Authorized administrators only</p></>:<><h2>Welcome back</h2><p>Use your registered email and password.</p></>}
+    <Field label={administration?'Email':'Email address'} name="email" type="email" value={email} onChange={setEmail} maxLength={320} error={fields.email}/>
+    <Field label="Password" name="password" type="password" value={password} onChange={setPassword} maxLength={128} error={fields.password}/>
+    {(error||auth.error)&&<ErrorNotice message={error||auth.error}/>}
+    <button className="btn btn-primary wide" disabled={busy}>{busy?'Signing in...':'Sign in'}</button>
+    {!administration&&<p><Link className="text-link" to="/register">Create account</Link></p>}
+    <small>Sessions expire automatically. Reloading this page requires signing in again.</small>
+  </form>;
+  if(administration)return <div className="login-page"><div className="login-brand"><Logo/></div><div className="login-form-wrap admin-login-form">{loginForm}</div></div>;
+  return <div className="login-split clay"><div className="login-aside"><Logo/><div><p className="eyebrow">Your neighbourhood marketplace</p><h1>Welcome to What Not?</h1><p>Connect with local makers. Sign in to manage your account.</p></div></div><div className="login-form-wrap"><Link to="/login">Back to workspace selection</Link>{loginForm}</div></div>;
 }
 export function RegisterPage(){
   const [form,setForm]=useState<Registration>({name:'',email:'',phone:'',password:'',role:'BUYER'});const [error,setError]=useState('');const [fields,setFields]=useState<Record<string,string>>({});const [notice,setNotice]=useState('');const [busy,setBusy]=useState(false);

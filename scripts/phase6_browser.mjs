@@ -40,8 +40,8 @@ async function sizes(name){
   }
   await page.setViewportSize({width:1280,height:900});
 }
-async function login(email,password){await page.getByLabel('Email address').fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByRole('button',{name:'Log out',exact:true}).waitFor();}
-async function logout(){await page.getByRole('button',{name:'Log out',exact:true}).click();await page.getByRole('heading',{name:'Welcome back',exact:true}).waitFor();assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);}
+async function login(email,password){await page.getByLabel(/^Email(?: address)?$/).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByRole('button',{name:'Log out',exact:true}).waitFor();}
+async function logout(){await page.getByRole('button',{name:'Log out',exact:true}).click();await page.getByRole('heading',{name:/^(Welcome back|What Not\? Administration)$/}).waitFor();assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);}
 try{
   await page.goto(config.ui+'/register');await sizes('registration');
   await page.getByLabel('Name',{exact:true}).fill('Ravi');await page.getByLabel('Email address').fill('seller.phase6@example.com');await page.getByLabel('Phone',{exact:true}).fill('phase6-seller');await page.getByLabel('Password',{exact:true}).fill(config.password);await page.getByLabel('Account type').selectOption('SELLER');await page.getByRole('button',{name:'Create account',exact:true}).click();await page.getByRole('status').filter({hasText:'Account created'}).waitFor();
