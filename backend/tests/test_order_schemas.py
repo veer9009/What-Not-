@@ -55,7 +55,7 @@ def test_order_requires_address_id():
         OrderCreate(seller_id=2, items=[{'product_id': 10, 'quantity': 1}])
 
 
-@pytest.mark.parametrize("status", ["PLACED", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED", "REJECTED"])
+@pytest.mark.parametrize("status", ["PLACED", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "AWAITING_BUYER_CONFIRMATION", "DELIVERED", "CANCELLED", "REJECTED"])
 def test_order_status_values(status):
     assert OrderResponse(**response_data(status=status)).status.value == status
     assert OrderStatusUpdate(status=status).status.value == status

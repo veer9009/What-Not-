@@ -1,4 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
+/* Order progress and support share the marketplace's Warm Orange tokens. */
+.order-details{margin-top:1.25rem;overflow-wrap:anywhere}
+.order-tracking{margin:1.5rem 0}
+.order-tracking h2,.delivery-confirmation h2,.help-panel h2{font-size:1.5rem}
+.order-tracking ol{list-style:none;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}
+.order-tracking li{display:flex;align-items:flex-start;gap:.7rem;padding:.85rem;border:1px solid var(--color-border);border-radius:12px;color:var(--color-text-muted)}
+.order-tracking li.current{background:var(--color-primary-soft);border:2px solid var(--color-primary);color:var(--color-text);font-weight:700}
+.tracking-marker{flex-shrink:0;display:grid;place-items:center;width:1.7rem;height:1.7rem;border:1px solid currentColor;border-radius:50%;font-size:.8rem}
+.current .tracking-marker,.completed .tracking-marker{background:var(--color-primary);border-color:var(--color-primary);color:white}
+.order-tracking small{display:block;font-weight:400;font-size:.7rem;margin-top:.3rem}
+.delivery-confirmation{border:1px solid var(--color-primary);background:var(--color-primary-soft);border-radius:12px;padding:1.2rem;margin:1.5rem 0}
+.delivery-actions{display:flex;flex-wrap:wrap;gap:.8rem}
+.delivery-actions .btn{white-space:normal;text-align:center}
+.order-ended{padding:1rem;border-left:4px solid var(--color-text-muted);background:var(--color-background)}
+.order-support{border-top:1px solid var(--color-border);margin-top:1.5rem;padding-top:1rem}
+.order-support p,.help-panel p,.help-panel li{line-height:1.7}
+.help-panel{max-width:760px}
+.help-panel>svg{color:var(--color-primary)}
+.help-panel ul{padding-left:1.3rem;margin-bottom:1.5rem}
+@media(max-width:1000px){.order-tracking ol{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.order-tracking ol{grid-template-columns:1fr}.delivery-actions{flex-direction:column}.order-details .form-actions{flex-wrap:wrap}}
 :root{
   --color-primary:#b9470b;--color-primary-hover:#963707;--color-primary-soft:#ffead6;
   --color-background:#fff8ef;--color-surface:#ffffff;--color-text:#292521;

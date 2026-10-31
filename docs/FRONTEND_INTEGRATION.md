@@ -180,10 +180,20 @@ replacement address; frontend controls cannot bypass that rule.
 BUYER and SELLER order histories/details use their owned records only. Buyers see
 cancellation for PLACED/ACCEPTED. Seller controls suggest the existing service map:
 PLACED -> ACCEPTED/CANCELLED/REJECTED; ACCEPTED -> PREPARING/CANCELLED;
-PREPARING -> OUT_FOR_DELIVERY; OUT_FOR_DELIVERY -> DELIVERED. Terminal states show no
+PREPARING -> OUT_FOR_DELIVERY; OUT_FOR_DELIVERY -> AWAITING_BUYER_CONFIRMATION.
+Only the owning buyer sees receipt confirmation in that new state; it calls the
+existing PATCH status API to set DELIVERED. Both roles reload order details after
+successful writes and block duplicate submissions while pending. Terminal states show no
 actions. These are UX suggestions: every transition is still checked by FastAPI and
 the service, and conflicts are displayed. Totals and order-item snapshots come from
 the backend; React does not recalculate real financial totals.
+
+Buyer order details include a six-stage tracker with an accessible current stage,
+without stage timestamps. Cancelled/rejected orders show an ended state. Help &
+Support is a dedicated buyer navigation page at /buyer/help. General and order
+support links open WhatsApp at +91 80800 98882; the order message contains only the
+public order reference. The delivery-problem action opens that support path without
+changing order status. There is no dispute/ticketing backend or automatic resolution.
 
 ## Transitional limits
 

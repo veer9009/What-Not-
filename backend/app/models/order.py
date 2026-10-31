@@ -21,7 +21,7 @@ class Order(IdMixin, TimestampMixin, Base):
         UniqueConstraint('buyer_id', 'idempotency_key', name='uq_orders_buyer_id_idempotency_key'),
         CheckConstraint('(idempotency_key IS NULL AND request_fingerprint IS NULL) OR '
                         '(idempotency_key IS NOT NULL AND request_fingerprint IS NOT NULL)', name='idempotency_pair'),
-        CheckConstraint("status IN ('PLACED','ACCEPTED','PREPARING','OUT_FOR_DELIVERY','DELIVERED','CANCELLED','REJECTED')", name="status"),
+        CheckConstraint("status IN ('PLACED','ACCEPTED','PREPARING','OUT_FOR_DELIVERY','AWAITING_BUYER_CONFIRMATION','DELIVERED','CANCELLED','REJECTED')", name="status"),
         CheckConstraint("subtotal >= 0 AND subtotal != 'NaN'::numeric", name="subtotal"),
         CheckConstraint("delivery_fee >= 0 AND delivery_fee != 'NaN'::numeric", name="delivery_fee"),
         CheckConstraint("total_amount >= 0 AND total_amount != 'NaN'::numeric", name="total_amount"),
@@ -32,7 +32,7 @@ class Order(IdMixin, TimestampMixin, Base):
     address_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("addresses.id", ondelete="RESTRICT"), index=True)
     idempotency_key: Mapped[UUID | None] = mapped_column(Uuid)
     request_fingerprint: Mapped[str | None] = mapped_column(String(64))
-    status: Mapped[str] = mapped_column(String(20), server_default="PLACED")
+    status: Mapped[str] = mapped_column(String(32), server_default="PLACED")
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     delivery_fee: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))

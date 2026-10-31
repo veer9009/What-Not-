@@ -36,6 +36,6 @@ def get_order(order_id: IdentifierPath, user: OrderActor, session: TransactionSe
     return order_response(OrderService(session).get(user.id, order_id))
 
 
-@router.patch("/{order_id}/status", response_model=OrderResponse, description='Owning buyers may cancel eligible orders; owning sellers may perform supported transitions.')
+@router.patch("/{order_id}/status", response_model=OrderResponse, description='Owning buyers may cancel eligible orders or confirm receipt after seller handover. Owning sellers may progress orders through handover, but cannot mark delivered.')
 def update_order_status(order_id: IdentifierPath, payload: OrderStatusUpdate, user: OrderActor, session: TransactionSession):
     return order_response(OrderService(session).transition(user.id, order_id, payload.status))

@@ -151,11 +151,14 @@ direct SQL can still change them.
 | PLACED | ACCEPTED, CANCELLED, REJECTED |
 | ACCEPTED | PREPARING, CANCELLED |
 | PREPARING | OUT_FOR_DELIVERY |
-| OUT_FOR_DELIVERY | DELIVERED |
+| OUT_FOR_DELIVERY | AWAITING_BUYER_CONFIRMATION (owning seller) |
+| AWAITING_BUYER_CONFIRMATION | DELIVERED (owning buyer only) |
 | DELIVERED, CANCELLED, REJECTED | None |
 
-The owning buyer can cancel PLACED/ACCEPTED orders. The owning seller performs
-allowed seller transitions. ADMIN is not automatically an order owner. Repeated
+The owning buyer can cancel PLACED/ACCEPTED orders and confirm receipt only from
+AWAITING_BUYER_CONFIRMATION. The owning seller performs allowed seller transitions
+through handover and is never authorized to set DELIVERED. ADMIN cannot impersonate
+the buyer. Historical DELIVERED orders remain unchanged and readable. Repeated
 status changes fail. Cancellation/rejection locks the order, checks current state,
 then locks products in ascending ID order and restores quantities atomically.
 Competing terminal requests cannot restock twice. If restoration exceeds the stock

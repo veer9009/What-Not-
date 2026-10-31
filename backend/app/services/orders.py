@@ -23,7 +23,8 @@ TRANSITIONS = {
     'PLACED': frozenset({'ACCEPTED', 'CANCELLED', 'REJECTED'}),
     'ACCEPTED': frozenset({'PREPARING', 'CANCELLED'}),
     'PREPARING': frozenset({'OUT_FOR_DELIVERY'}),
-    'OUT_FOR_DELIVERY': frozenset({'DELIVERED'}),
+    'OUT_FOR_DELIVERY': frozenset({'AWAITING_BUYER_CONFIRMATION'}),
+    'AWAITING_BUYER_CONFIRMATION': frozenset({'DELIVERED'}),
     'DELIVERED': frozenset(), 'CANCELLED': frozenset(), 'REJECTED': frozenset(),
 }
 
@@ -132,8 +133,10 @@ class OrderService:
         if order is None:
             raise OrderNotFound('Order does not exist')
         role = self._owned(actor, order)
-        if role == 'BUYER' and new_status != 'CANCELLED':
-            raise OwnershipError('Buyers may only cancel eligible orders')
+        if role == 'BUYER' and new_status not in {'CANCELLED', 'DELIVERED'}:
+            raise OwnershipError('Buyers may only cancel eligible orders or confirm receipt')
+        if role == 'SELLER' and new_status == 'DELIVERED':
+            raise OwnershipError('Only the owning buyer may confirm receipt')
         if new_status not in TRANSITIONS[order.status]:
             raise InvalidOrderTransition('Order cannot transition to the requested status')
         if new_status in {'CANCELLED', 'REJECTED'}:

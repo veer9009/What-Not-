@@ -39,7 +39,7 @@ def test_openapi_exposes_contracts_and_documents_placeholders(client):
     assert 'address_id' in models['OrderCreate']['required']
     assert 'buyer_id' not in models['OrderCreate']['properties']
     assert set(models["ProductStatus"]["enum"]) == {"PENDING", "APPROVED", "REJECTED"}
-    assert set(models["OrderStatus"]["enum"]) == {"PLACED", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED", "REJECTED"}
+    assert set(models["OrderStatus"]["enum"]) == {"PLACED", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "AWAITING_BUYER_CONFIRMATION", "DELIVERED", "CANCELLED", "REJECTED"}
     assert "status" not in models["ProductCreate"]["properties"]
     placeholders = {('/api/v1/products', 'get'), ('/api/v1/products/{product_id}', 'get')}
     for path, methods in schema["paths"].items():

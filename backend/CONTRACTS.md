@@ -57,7 +57,13 @@ One seller_id expresses one seller per order. Schema validation cannot look up p
 
 `OrderItemResponse` includes product_id, seller_id, name, quantity and unit_price as a purchase snapshot. `OrderResponse` contains id, buyer_id, seller_id, items, status, subtotal, delivery_fee and total. It validates matching item sellers, unique products, subtotal arithmetic and total = subtotal + delivery_fee. The internal service uses a configurable provisional 0.00 delivery fee; the frontend's ₹49 mock fee is not a backend rule.
 
-Statuses: PLACED, ACCEPTED, PREPARING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, REJECTED.
+Statuses: PLACED, ACCEPTED, PREPARING, OUT_FOR_DELIVERY,
+AWAITING_BUYER_CONFIRMATION, DELIVERED, CANCELLED, REJECTED.
+The existing PATCH /orders/{order_id}/status endpoint accepts seller handover as
+AWAITING_BUYER_CONFIRMATION from OUT_FOR_DELIVERY. Only the owning authenticated
+BUYER can set DELIVERED, and only from AWAITING_BUYER_CONFIRMATION. Seller delivery
+finalization, unrelated users, and ADMIN receive 403; invalid or repeated allowed
+actor transitions receive 409. Successful updates return 200 with OrderResponse.
 Schemas validate values; services enforce transitions and authenticated ownership.
 Phase 5 allows owned order reads/transitions, including inventory restoration on
 cancellation/rejection. Public placement remains 501.

@@ -5,6 +5,7 @@ import { BuyerDashboard, CartPage, ProductDetailsPage } from './pages/BuyerPages
 import { ProductFormPage, SellerDashboard, SellerProfilePage } from './pages/SellerPages';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AddressPage } from './pages/AddressPage';
+import { HelpPage } from './pages/HelpPage';
 import { BuyerProfilePage, OrderDetailsPage, OrderHistoryPage } from './pages/OrderPages';
 import { WhatsAppButton } from './components/Shared';
 import { Loading } from './components/ApiStates';
@@ -18,6 +19,7 @@ function Application(){const {user}=useAuth();return <DiscoveryProvider key={use
   <Route path="/" element={<LandingPage/>}/><Route path="/login" element={<RoleSelectionPage/>}/><Route path="/login/:role" element={<LoginPage/>}/><Route path="/register" element={<RegisterPage/>}/>
   <Route path="/admin/login" element={<LoginPage administration/>}/><Route path="/login/admin" element={<Navigate to="/admin/login" replace/>}/>
   <Route element={<RequireRole role="BUYER"/>}><Route path="/buyer" element={<BuyerDiscoveryPage/>}/><Route path="/buyer/samples" element={<BuyerDashboard/>}/><Route path="/buyer/samples/products/:id" element={<ProductDetailsPage/>}/><Route path="/buyer/profile" element={<BuyerProfilePage/>}/><Route path="/buyer/products/:id" element={<DiscoveryDetailPage/>}/><Route path="/buyer/cart" element={<CartPage/>}/><Route path="/buyer/addresses" element={<AddressPage/>}/><Route path="/buyer/orders" element={<OrderHistoryPage/>}/><Route path="/buyer/orders/:id" element={<OrderDetailsPage/>}/></Route>
+  <Route element={<RequireRole role="BUYER"/>}><Route path="/buyer/help" element={<HelpPage/>}/></Route>
   <Route element={<RequireRole role="SELLER"/>}><Route path="/seller" element={<SellerDashboard/>}/><Route path="/seller/profile" element={<SellerProfilePage/>}/><Route path="/seller/products/new" element={<ProductFormPage/>}/><Route path="/seller/products/:id/edit" element={<ProductFormPage/>}/><Route path="/seller/addresses" element={<AddressPage/>}/><Route path="/seller/orders" element={<OrderHistoryPage/>}/><Route path="/seller/orders/:id" element={<OrderDetailsPage/>}/></Route>
   <Route element={<RequireRole role="ADMIN"/>}><Route path="/admin" element={<AdminDashboard/>}/><Route path="/admin/addresses" element={<AddressPage/>}/></Route>
   <Route path="*" element={<Navigate to="/" replace/>}/>
