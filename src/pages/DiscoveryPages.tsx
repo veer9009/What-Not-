@@ -8,6 +8,8 @@ import { addressesApi } from '../api/addresses';
 import { discoveryApi } from '../api/discovery';
 import { useDiscovery } from '../state/DiscoveryContext';
 import { useResource } from '../state/useResource';
+import { useDemo } from '../state/DemoContext';
+import { identifier } from '../api/client';
 
 function BuyerLocation(){
   const {source,choose}=useDiscovery();const addresses=useResource(addressesApi.list);
@@ -17,7 +19,7 @@ function BuyerLocation(){
   </section>;
 }
 export function BuyerDiscoveryPage(){
-  return <DashboardShell role="buyer"><PageTop eyebrow="Your neighbourhood" title="Discover What Not?"/><ExploreVerticals live/><BuyerLocation/><section id="homemade-catalogue" aria-labelledby="homemade-catalogue-heading"><h2 id="homemade-catalogue-heading">Nearby Homemade products</h2><p>Products shown are approved, active, in stock and within the seller's delivery radius. Food-specific listing tools are coming soon. Checkout remains unavailable.</p><DiscoveryResults/></section></DashboardShell>;
+  return <DashboardShell role="buyer"><PageTop eyebrow="Your neighbourhood" title="Discover What Not?"/><ExploreVerticals live/><BuyerLocation/><section id="homemade-catalogue" aria-labelledby="homemade-catalogue-heading"><h2 id="homemade-catalogue-heading">Nearby Homemade products</h2><p>Products shown are approved, active, in stock and within the seller's delivery radius. Food-specific listing tools are coming soon. Add real products to your cart to place an order. Delivery is currently free; no payment is collected.</p><DiscoveryResults/></section></DashboardShell>;
 }
 function DiscoveryResults(){
   const {source}=useDiscovery();
@@ -38,8 +40,12 @@ export function DiscoveryDetailPage(){
 }
 function LocatedDetail({id}:{id:string}){
   const {source}=useDiscovery();const load=useCallback(()=>discoveryApi.detail(id,source!),[id,source]);const result=useResource(load);
+  const {state,dispatch}=useDemo();const [added,setAdded]=useState(false);
   if(result.loading)return <Loading/>;
   if(result.error)return <ErrorNotice message={result.error} retry={()=>void result.reload()}/>;
   const p=result.data!;
-  return <div className="product-detail">{p.image_url&&<div className="detail-image"><img src={p.image_url} alt={p.name} referrerPolicy="no-referrer"/></div>}<div className="detail-copy"><p className="eyebrow">{p.category} · Approximately {p.distance_km.toFixed(2)} km away</p><h1>{p.name}</h1><p>{p.shop_name}{p.is_verified?' · Verified seller':''}</p><strong className="detail-price">₹{p.price}</strong><p>{p.description}</p><p>{p.stock_quantity} in stock · {p.delivery_radius_km} km delivery radius</p><p>Available for your selected discovery location at the time of this check. Location and distance are approximate.</p><button className="btn btn-primary" disabled>Checkout unavailable</button><p>Ordering and payments are not available yet.</p></div></div>;
+  let orderable=true;try{identifier(p.id);identifier(p.seller_id);}catch{orderable=false;}
+  const item=state.cart.find(item=>item.productId===`backend:${p.id}`);
+  const recovering=state.placements?.some(attempt=>attempt.cartIds.includes(`backend:${p.id}`));
+  return <div className="product-detail">{p.image_url&&<div className="detail-image"><img src={p.image_url} alt={p.name} referrerPolicy="no-referrer"/></div>}<div className="detail-copy"><p className="eyebrow">{p.category} · Approximately {p.distance_km.toFixed(2)} km away</p><h1>{p.name}</h1><p>{p.shop_name}{p.is_verified?' · Verified seller':''}</p><strong className="detail-price">₹{p.price}</strong><p>{p.description}</p><p>{p.stock_quantity} in stock · {p.delivery_radius_km} km delivery radius</p><p>Available for your selected discovery location at the time of this check. Location and distance are approximate.</p><button className="btn btn-primary" disabled={!orderable||recovering||item?.placementUncertain||(item?.quantity??0)>=p.stock_quantity} onClick={()=>{dispatch({type:'cart/add-discovered',product:p});setAdded(true);}}>Add to Cart</button>{added&&<p className="success-note" role="status">Added to your cart. <Link to="/buyer/cart">View cart</Link></p>}<p>Choose a saved delivery address in your cart to place an order. Delivery is Free (₹0). No payment is collected.</p>{!orderable&&<p role="alert">This product is missing valid ordering identifiers and cannot be added.</p>}</div></div>;
 }

@@ -33,7 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.add_middleware(
         CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization"],
+        allow_headers=["Content-Type", "Authorization", "Idempotency-Key"],
     )
     for router in (health.router, auth.router, products.router, orders.router, admin.router, addresses.router, sellers.router, discovery.router):
         application.include_router(router, prefix="/api/v1")

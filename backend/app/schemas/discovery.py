@@ -26,6 +26,7 @@ class DiscoveryQuery(DiscoverySource):
 
 class BuyerProduct(ProductCreate):
     id: DatabaseId
+    seller_id: DatabaseId
     shop_name: Name
     is_verified: Annotated[bool, Field(strict=True)]
     distance_km: Annotated[float, Field(ge=0, allow_inf_nan=False)]

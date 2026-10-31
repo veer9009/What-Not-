@@ -26,6 +26,8 @@ def market(db):
     admin = users.create(UserCreate(name='Admin', email='a@example.com', phone='300', password_hash=HASH, role='ADMIN'))
     sellers = SellerService(db)
     seller = sellers.create(owner.id, SellerCreate(shop_name='Maker', phone='200', latitude='19', longitude='72'))
+    from app.schemas.location import Coordinate
+    sellers.set_dispatch_location(owner.id, Coordinate(latitude=19, longitude=72))
     products = ProductService(db)
     product = products.create(owner.id, seller.id, ProductCreate(name='Vase', description='Handmade', price='25.50', stock_quantity=5, category='Crafts', delivery_radius_km=2, image_url='https://example.com/vase.jpg'))
     addresses = AddressService(db)

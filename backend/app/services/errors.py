@@ -61,6 +61,10 @@ class ProductUnavailable(ServiceError):
     pass
 
 
+class DeliveryIneligible(ProductUnavailable):
+    pass
+
+
 class InsufficientStock(ServiceError):
     pass
 
@@ -74,4 +78,8 @@ class AmountOverflow(ServiceError):
 
 
 class PersistenceConflict(ServiceError):
+    pass
+
+
+class IdempotencyConflict(ServiceError):
     pass

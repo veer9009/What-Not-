@@ -21,11 +21,10 @@ class OrderItem(ContractModel):
 
 
 class OrderCreate(ContractModel):
-    """One seller per request. The future service must resolve product ownership,
-    buyer identity, eligibility, stock and prices before creating an order.
-    """
+    """One seller per request; identity, pricing and inventory are server-owned."""
 
     seller_id: DatabaseId
+    address_id: DatabaseId
     items: list[OrderItem] = Field(min_length=1)
 
     @model_validator(mode="after")

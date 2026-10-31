@@ -30,7 +30,12 @@ def install_error_handlers(app):
             status = 404
         else:
             status = 409
-        return JSONResponse(status_code=status, content={'detail': str(exc)})
+        content = {'detail': str(exc)}
+        if isinstance(exc, errors.DeliveryIneligible):
+            content['code'] = 'DELIVERY_INELIGIBLE'
+        if isinstance(exc, errors.IdempotencyConflict):
+            content['code'] = 'IDEMPOTENCY_CONFLICT'
+        return JSONResponse(status_code=status, content=content)
 
     @app.exception_handler(SQLAlchemyError)
     async def storage_error(request, exc):

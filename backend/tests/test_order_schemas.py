@@ -11,11 +11,12 @@ def response_data(**changes):
 
 
 def test_order_creation_declares_one_seller_and_product_references():
-    order = OrderCreate(seller_id=2, items=[{"product_id": 10, "quantity": 2}])
+    order = OrderCreate(seller_id=2, address_id=3, items=[{"product_id": 10, "quantity": 2}])
     assert order.seller_id == 2
+    assert order.address_id == 3
     assert order.items[0].product_id == 10
     with pytest.raises(ValidationError):
-        OrderCreate(seller_id=2, items=[{"product_id": 10, "quantity": 2, "seller_id": 3}])
+        OrderCreate(seller_id=2, address_id=3, items=[{"product_id": 10, "quantity": 2, "seller_id": 3}])
 
 
 @pytest.mark.parametrize("quantity", [0, -1, 1.5, True, "2"])
@@ -33,13 +34,25 @@ def test_product_id_is_a_positive_bigint(product_id):
 def test_empty_and_duplicate_order_items_rejected():
     for items in [[], [{"product_id": 10, "quantity": 1}, {"product_id": 10, "quantity": 2}]]:
         with pytest.raises(ValidationError):
-            OrderCreate(seller_id=2, items=items)
+            OrderCreate(seller_id=2, address_id=3, items=items)
 
 
-@pytest.mark.parametrize("field,value", [("buyer_id", 1), ("status", "DELIVERED"), ("total", "0")])
+@pytest.mark.parametrize("field,value", [("buyer_id", 1), ("status", "DELIVERED"), ("total", "0"),
+    ("subtotal", "0"), ("delivery_fee", "0"), ("price", "0"), ("stock_quantity", 10)])
 def test_client_cannot_supply_server_order_fields(field, value):
     with pytest.raises(ValidationError):
-        OrderCreate(seller_id=2, items=[{"product_id": 10, "quantity": 1}], **{field: value})
+        OrderCreate(seller_id=2, address_id=3, items=[{"product_id": 10, "quantity": 1}], **{field: value})
+
+
+@pytest.mark.parametrize('address_id', [None, 0, -1, True, '3', 2**63])
+def test_order_requires_valid_address_id(address_id):
+    with pytest.raises(ValidationError):
+        OrderCreate(seller_id=2, address_id=address_id, items=[{'product_id': 10, 'quantity': 1}])
+
+
+def test_order_requires_address_id():
+    with pytest.raises(ValidationError):
+        OrderCreate(seller_id=2, items=[{'product_id': 10, 'quantity': 1}])
 
 
 @pytest.mark.parametrize("status", ["PLACED", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED", "REJECTED"])

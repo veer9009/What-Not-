@@ -25,7 +25,7 @@ class DiscoveryService:
         distance = distance_km(location.latitude, location.longitude, seller.latitude, seller.longitude)
         if not within_radius(distance, product.delivery_radius_km):
             return None
-        return BuyerProduct(id=product.id, name=product.name, description=product.description,
+        return BuyerProduct(id=product.id, seller_id=product.seller_id, name=product.name, description=product.description,
             price=product.price, stock_quantity=product.stock_quantity, category=product.category,
             delivery_radius_km=product.delivery_radius_km,
             image_url=next((i.image_url for i in product.images if i.is_primary), None),

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 from typing import TYPE_CHECKING
-from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Numeric, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, IdMixin, TimestampMixin
 
@@ -17,6 +18,9 @@ class Order(IdMixin, TimestampMixin, Base):
     __tablename__ = "orders"
     __table_args__ = (
         UniqueConstraint("id", "seller_id", name="uq_orders_id_seller_id"),
+        UniqueConstraint('buyer_id', 'idempotency_key', name='uq_orders_buyer_id_idempotency_key'),
+        CheckConstraint('(idempotency_key IS NULL AND request_fingerprint IS NULL) OR '
+                        '(idempotency_key IS NOT NULL AND request_fingerprint IS NOT NULL)', name='idempotency_pair'),
         CheckConstraint("status IN ('PLACED','ACCEPTED','PREPARING','OUT_FOR_DELIVERY','DELIVERED','CANCELLED','REJECTED')", name="status"),
         CheckConstraint("subtotal >= 0 AND subtotal != 'NaN'::numeric", name="subtotal"),
         CheckConstraint("delivery_fee >= 0 AND delivery_fee != 'NaN'::numeric", name="delivery_fee"),
@@ -26,6 +30,8 @@ class Order(IdMixin, TimestampMixin, Base):
     buyer_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), index=True)
     seller_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("seller_profiles.id", ondelete="RESTRICT"), index=True)
     address_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("addresses.id", ondelete="RESTRICT"), index=True)
+    idempotency_key: Mapped[UUID | None] = mapped_column(Uuid)
+    request_fingerprint: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20), server_default="PLACED")
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     delivery_fee: Mapped[Decimal] = mapped_column(Numeric(12, 2))

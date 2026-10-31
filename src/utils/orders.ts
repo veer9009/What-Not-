@@ -1,7 +1,7 @@
 import type { CartItem, Product, SellerOrder } from '../types';
 import { isBuyerEligible } from './products';
 
-export const DELIVERY_FEE = 49;
+export const DELIVERY_FEE = 0;
 
 // Validate the entire basket again at checkout; never silently order a partial basket.
 export function createSellerOrders(products: Product[], cart: CartItem[], id: string): SellerOrder[] {
@@ -12,10 +12,12 @@ export function createSellerOrders(products: Product[], cart: CartItem[], id: st
     if (!product || !isBuyerEligible(product) || !Number.isInteger(item.quantity) ||
       item.quantity < 1 || item.quantity > product.stock || seen.has(item.productId)) return [];
     seen.add(item.productId);
-    let order = groups.get(product.seller);
+    const sellerKey = product.backend ? `backend:${product.backend.sellerId}` : `sample:${product.seller}`;
+    let order = groups.get(sellerKey);
     if (!order) {
-      order = { id: `${id}-${groups.size + 1}`, seller: product.seller, items: [], subtotal: 0, delivery: DELIVERY_FEE, total: 0 };
-      groups.set(product.seller, order);
+      order = { id: `${id}-${groups.size + 1}`, seller: product.seller, sellerId: product.backend?.sellerId,
+        items: [], subtotal: 0, delivery: DELIVERY_FEE, total: 0 };
+      groups.set(sellerKey, order);
     }
     order.items.push({ product: { ...product }, quantity: item.quantity });
     order.subtotal += product.price * item.quantity;

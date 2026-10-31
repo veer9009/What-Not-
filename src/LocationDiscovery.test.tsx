@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import App from './App';
 import { setAccessToken } from './api/client';
 
-const product={id:3,name:'Nearby vase',description:'A handmade vase',price:'250.00',stock_quantity:5,category:'Crafts',delivery_radius_km:2,image_url:null,shop_name:'Local maker',is_verified:false,distance_km:0.14};
+const product={id:3,seller_id:2,name:'Nearby vase',description:'A handmade vase',price:'250.00',stock_quantity:5,category:'Crafts',delivery_radius_km:2,image_url:null,shop_name:'Local maker',is_verified:false,distance_km:0.14};
 const address={id:4,user_id:1,label:'Home',address_line1:'Maker Lane',city:'Mumbai',state:'Maharashtra',pincode:'400001',latitude:'19',longitude:'72',is_default:true};
 type Reply = [number, unknown];
 function setup(handler:(path:string,body:any)=>Reply|Promise<Reply>,path='/buyer'){
@@ -25,7 +25,7 @@ async function manual(){
   await userEvent.type(screen.getByLabelText('Longitude'),'72');
   await userEvent.click(screen.getByRole('button',{name:'Use for discovery'}));
 }
-it('requires an explicit source, uses backend list/detail and keeps checkout disabled',async()=>{
+it('requires an explicit source, uses backend list/detail and adds real products to the cart',async()=>{
   const fetcher=setup((path,body)=>{
     if(path==='/addresses')return [200,[]];
     expect(body).toEqual({location:{latitude:19,longitude:72}});
@@ -39,8 +39,8 @@ it('requires an explicit source, uses backend list/detail and keeps checkout dis
   expect(screen.queryByText(/sample distance/i)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('link',{name:'View Nearby vase'}));
   await screen.findByRole('heading',{name:'Nearby vase'});
-  expect(screen.getByRole('button',{name:'Checkout unavailable'})).toBeDisabled();
-  expect(screen.queryByRole('button',{name:/add to cart/i})).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button',{name:/add to cart/i}));
+  expect(screen.getByRole('link',{name:'View cart'})).toHaveAttribute('href','/buyer/cart');
   await userEvent.click(screen.getByRole('link',{name:'Back to discovery'}));
   await screen.findByRole('link',{name:'View Nearby vase'});
 });

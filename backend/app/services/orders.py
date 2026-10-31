@@ -1,4 +1,6 @@
 from decimal import Decimal
+from hashlib import sha256
+import json
 
 from pydantic import TypeAdapter
 from sqlalchemy.orm import Session
@@ -9,9 +11,10 @@ from app.repositories.products import ProductRepository
 from app.schemas.common import MAX_INTEGER, MAX_MONEY, Money
 from app.schemas.order import OrderStatus
 from app.services.addresses import owned_address
-from app.services.errors import (AmountOverflow, InsufficientStock, InvalidOrderTransition,
+from app.services.errors import (AmountOverflow, DeliveryIneligible, IdempotencyConflict, InsufficientStock, InvalidOrderTransition,
     OrderNotFound, OwnershipError, ProductNotFound, ProductUnavailable)
 from app.services.inputs import OrderPlacement
+from app.services.geography import distance_km, within_radius
 from app.services.operations import write_operation
 from app.services.sellers import owned_seller, require_seller
 from app.services.users import pagination, require_user
@@ -43,12 +46,29 @@ class OrderService:
 
     @write_operation
     def create(self, data: OrderPlacement):
-        """Atomic inventory reservation; geographic eligibility is NOT implemented."""
+        """Atomic placement with locked inventory and authoritative delivery eligibility."""
         data = OrderPlacement.model_validate(data)
         require_user(self.session, data.buyer_id, role='BUYER', lock='shared')
-        owned_address(self.session, data.buyer_id, data.address_id, lock=True)
+        fingerprint = None
+        if data.idempotency_key is not None:
+            logical_request = dict(address_id=data.address_id, seller_id=data.seller_id,
+                items=[item.model_dump() for item in sorted(data.items, key=lambda item: item.product_id)])
+            fingerprint = sha256(json.dumps(logical_request, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+            self.repository.lock_idempotency(data.buyer_id, data.idempotency_key)
+            existing = self.repository.for_idempotency(data.buyer_id, data.idempotency_key)
+            if existing is not None:
+                if existing.request_fingerprint != fingerprint:
+                    raise IdempotencyConflict('This idempotency key was already used for a different order request')
+                # A replay returns the purchase snapshot, even if stock/location has changed.
+                return existing
+        address = owned_address(self.session, data.buyer_id, data.address_id, lock=True)
         seller = require_seller(self.session, data.seller_id)
         require_user(self.session, seller.user_id, role='SELLER', lock='shared')
+        # Match seller writes' user-before-profile lock order; refresh cached coordinates.
+        seller = require_seller(self.session, data.seller_id, lock='shared')
+        if seller.dispatch_location_confirmed_at is None:
+            raise ProductUnavailable('Seller dispatch location must be confirmed before ordering')
+        distance = distance_km(address.latitude, address.longitude, seller.latitude, seller.longitude)
         products = self.products.lock_many([item.product_id for item in data.items])
         by_id = {product.id: product for product in products}
         if len(by_id) != len(data.items):
@@ -59,6 +79,8 @@ class OrderService:
             product = by_id[requested.product_id]
             if product.seller_id != data.seller_id:
                 raise OwnershipError('Every product must belong to the order seller')
+            if not within_radius(distance, product.delivery_radius_km):
+                raise DeliveryIneligible('This product is outside the selected delivery address.')
             if product.status != 'APPROVED' or not product.is_active or product.stock_quantity <= 0 or product.price <= 0:
                 raise ProductUnavailable('Product is unavailable for purchase')
             if requested.quantity > product.stock_quantity:
@@ -71,6 +93,7 @@ class OrderService:
         if subtotal > MAX_MONEY or total > MAX_MONEY:
             raise AmountOverflow('Order amounts exceed the supported monetary range')
         order = Order(buyer_id=data.buyer_id, seller_id=data.seller_id, address_id=data.address_id,
+            idempotency_key=data.idempotency_key, request_fingerprint=fingerprint,
             status='PLACED', subtotal=subtotal, delivery_fee=delivery_fee, total_amount=total, items=items)
         self.repository.add(order)
         for requested in data.items:

@@ -3,7 +3,7 @@ import re
 from decimal import Decimal
 from typing import Annotated, ClassVar
 
-from pydantic import EmailStr, Field, SecretStr, field_validator, model_validator
+from pydantic import EmailStr, Field, SecretStr, UUID4, field_validator, model_validator
 
 from app.schemas.common import ContractModel, DatabaseId, Name
 from app.schemas.order import OrderCreate
@@ -92,4 +92,4 @@ class AddressUpdate(PatchInput):
 
 class OrderPlacement(OrderCreate):
     buyer_id: DatabaseId
-    address_id: DatabaseId
+    idempotency_key: UUID4 | None = None

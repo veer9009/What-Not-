@@ -1,8 +1,11 @@
-from fastapi import APIRouter
+from typing import Annotated
+from fastapi import APIRouter, Header
+from pydantic import UUID4
 
-from app.api.contracts import IdentifierPath, PLACEHOLDER_DESCRIPTION, PLACEHOLDER_RESPONSES, not_implemented
+from app.api.contracts import IdentifierPath
 from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate
-from app.api.dependencies import OrderActor, TransactionSession, current_seller_profile
+from app.api.dependencies import Buyer, OrderActor, TransactionSession, current_seller_profile
+from app.services.inputs import OrderPlacement
 from app.services.orders import OrderService
 from app.services.mappers import order_response
 
@@ -19,9 +22,13 @@ def list_orders(user: OrderActor, session: TransactionSession):
     return [order_response(order) for order in orders]
 
 
-@router.post("", response_model=OrderResponse, status_code=201, description=PLACEHOLDER_DESCRIPTION, responses=PLACEHOLDER_RESPONSES)
-async def create_order(payload: OrderCreate) -> OrderResponse:
-    not_implemented()
+@router.post("", response_model=OrderResponse, status_code=201,
+             description='Place a single-seller order as an authenticated buyer with server pricing, inventory and delivery eligibility checks for the selected owned address.')
+def create_order(payload: OrderCreate, user: Buyer, session: TransactionSession,
+                 idempotency_key: Annotated[UUID4, Header(alias='Idempotency-Key')]) -> OrderResponse:
+    placement = OrderPlacement(buyer_id=user.id, address_id=payload.address_id,
+                               seller_id=payload.seller_id, items=payload.items, idempotency_key=idempotency_key)
+    return order_response(OrderService(session).create(placement))
 
 
 @router.get("/{order_id}", response_model=OrderResponse, description='Read an order only as its owning buyer or seller.')

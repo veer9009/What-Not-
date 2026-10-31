@@ -12,8 +12,8 @@ from app.services.users import pagination, require_user
 from app.services.validation import revalidate_patch
 
 
-def require_seller(session, seller_id):
-    seller = SellerRepository(session).get(seller_id)
+def require_seller(session, seller_id, *, lock=False):
+    seller = SellerRepository(session).get(seller_id, lock=lock)
     if seller is None:
         raise SellerNotFound('Seller profile does not exist')
     return seller

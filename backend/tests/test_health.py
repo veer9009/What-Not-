@@ -47,3 +47,10 @@ def test_local_cors_preflight(client):
     rejected = client.options("/api/v1/products", headers={"Origin": "https://unlisted.example", "Access-Control-Request-Method": "POST"})
     assert rejected.status_code == 400
     assert "access-control-allow-origin" not in rejected.headers
+
+
+def test_cors_permits_idempotent_order_header(client):
+    response = client.options('/api/v1/orders', headers={'Origin': 'http://localhost:5173',
+        'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type,authorization,idempotency-key'})
+    assert response.status_code == 200
+    assert 'idempotency-key' in response.headers['access-control-allow-headers'].lower()

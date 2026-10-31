@@ -11,4 +11,5 @@ export interface Product extends ProductInput { id: Id; seller_id: Id; status: '
 export interface AddressInput { label: string; address_line1: string; address_line2: string | null; city: string; state: string; pincode: string; latitude: string; longitude: string; is_default: boolean }
 export interface Address extends AddressInput { id: Id; user_id: Id }
 export type OrderStatus = 'PLACED' | 'ACCEPTED' | 'PREPARING' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'REJECTED';
+export interface OrderCreate { seller_id: Id; address_id: Id; items: { product_id: Id; quantity: number }[] }
 export interface Order { id: Id; buyer_id: Id; seller_id: Id; status: OrderStatus; subtotal: string; delivery_fee: string; total: string; items: { product_id: Id; seller_id: Id; name: string; quantity: number; unit_price: string }[] }

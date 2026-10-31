@@ -27,6 +27,7 @@ def test_transient_and_owned_address_discovery_safe_responses(auth_client, avail
         assert response.headers['cache-control'] == 'no-store'
         product = response.json()[0]
         assert product['id'] == r['product'].id
+        assert product['seller_id'] == r['seller'].id
         assert product['shop_name'] == 'Local maker'
         assert isinstance(product['distance_km'], (float, int))
         assert not {'latitude', 'longitude', 'phone', 'user_id', 'dispatch_location_confirmed_at', 'address_id', 'seller'} & product.keys()

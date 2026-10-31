@@ -12,7 +12,7 @@ class SellerRepository:
     def get(self, seller_id: int, *, lock=False):
         query = select(SellerProfile).where(SellerProfile.id == database_id(seller_id))
         if lock:
-            query = query.with_for_update().execution_options(populate_existing=True)
+            query = query.with_for_update(read=lock == 'shared').execution_options(populate_existing=True)
         return self.session.scalar(query)
 
     def by_user(self, user_id: int):

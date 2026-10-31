@@ -1,4 +1,6 @@
-from sqlalchemy import select
+from hashlib import sha256
+
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Order
@@ -14,6 +16,18 @@ class OrderRepository:
         if lock:
             query = query.with_for_update().execution_options(populate_existing=True)
         return self.session.scalar(query)
+
+    def lock_idempotency(self, buyer_id, key):
+        # Database transaction lock, shared by all API workers. Hash collisions only
+        # serialize unrelated requests; lookup and the unique constraint remain exact.
+        scope = f'order-placement:{database_id(buyer_id)}:{key}'
+        lock_id = int.from_bytes(sha256(scope.encode()).digest()[:8], 'big', signed=True)
+        self.session.execute(text('SELECT pg_advisory_xact_lock(:lock_id)'), {'lock_id': lock_id})
+
+    def for_idempotency(self, buyer_id, key):
+        return self.session.scalar(select(Order).where(Order.buyer_id == database_id(buyer_id),
+            Order.idempotency_key == key).options(selectinload(Order.items))
+            .execution_options(populate_existing=True))
 
     def for_buyer(self, buyer_id: int, offset: int, limit: int):
         return list(self.session.scalars(select(Order).where(Order.buyer_id == database_id(buyer_id))

@@ -5,7 +5,7 @@ export function setAccessToken(token: string | null) { credential = token; gener
 export function getAccessToken() { return credential; }
 export function onUnauthorized(listener: () => void) { unauthorizedListeners.add(listener); return () => { unauthorizedListeners.delete(listener); }; }
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public fields: Record<string,string> = {}) { super(message); this.name = 'ApiError'; }
+  constructor(public status: number, message: string, public fields: Record<string,string> = {}, public code?: string) { super(message); this.name = 'ApiError'; }
 }
 const messages: Record<number,string> = {
   401: 'Your session expired or your credentials are invalid. Please sign in again.',
@@ -36,14 +36,15 @@ export function identifier(id: string) {
   if (!/^[1-9]\d*$/.test(id) || BigInt(id) > 9223372036854775807n) throw new ApiError(404, messages[404]);
   return id;
 }
-interface Options { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; bodyText?: string; auth?: boolean; signal?: AbortSignal }
-export async function api<T>(path: string, { method = 'GET', body, bodyText, auth = true, signal }: Options = {}): Promise<T> {
+interface Options { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; bodyText?: string; auth?: boolean; signal?: AbortSignal; idempotencyKey?: string }
+export async function api<T>(path: string, { method = 'GET', body, bodyText, auth = true, signal, idempotencyKey }: Options = {}): Promise<T> {
   const base = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
   const headers = new Headers({ Accept: 'application/json' });
   if (body !== undefined || bodyText !== undefined) headers.set('Content-Type', 'application/json');
   const token = auth ? credential : null;
   const started = generation;
   if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
   let response: Response;
   let raw: string;
   try {
@@ -67,7 +68,9 @@ export async function api<T>(path: string, { method = 'GET', body, bodyText, aut
         if (typeof field === 'string' && allowedFields.has(field)) fields[field] = 'Check this field against the form requirements.';
       }
     }
-    throw new ApiError(response.status, messages[response.status] || 'The marketplace service is unavailable. Please try again later.', fields);
+    const code = response.status === 409 && data && typeof data === 'object' && 'code' in data
+      && (data.code === 'DELIVERY_INELIGIBLE' || data.code === 'IDEMPOTENCY_CONFLICT') ? data.code : undefined;
+    throw new ApiError(response.status, messages[response.status] || 'The marketplace service is unavailable. Please try again later.', fields, code);
   }
   return data as T;
 }

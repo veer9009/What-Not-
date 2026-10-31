@@ -6,11 +6,17 @@ export interface Product {
   id: string; name: string; seller: string; price: number; distance: number; radius: 1 | 2 | 3;
   rating: number; category: Category; stock: number; description: string; status: ProductStatus;
   image: string; verified: boolean; isActive: boolean; rejectionReason?: string;
+  // Only the discovery add action supplies these identifiers; sample IDs never map to API IDs.
+  backend?: { productId: string; sellerId: string };
 }
-export interface CartItem { productId: string; quantity: number }
-export interface SellerOrder { id: string; seller: string; items: { product: Product; quantity: number }[]; subtotal: number; delivery: number; total: number }
-export interface DemoState { products: Product[]; cart: CartItem[]; orders: SellerOrder[] }
+export interface CartItem { productId: string; quantity: number; placementUncertain?: boolean; placementPending?: boolean }
+export interface SellerOrder { id: string; seller: string; sellerId?: string; items: { product: Product; quantity: number }[]; subtotal: number; delivery: number; total: number }
+export interface PlacementAttempt { key: string; request: import('./api/types').OrderCreate; seller: string; cartIds: string[]; pending: boolean }
+export interface DemoState { products: Product[]; cart: CartItem[]; orders: SellerOrder[]; placements?: PlacementAttempt[] }
 export type DemoAction =
+  | { type: 'cart/add-discovered'; product: import('./api/discovery').BuyerProduct }
+  | { type: 'cart/placement'; ids: string[]; uncertain: boolean; pending?: boolean; attempt?: PlacementAttempt }
+  | { type: 'cart/ordered'; ids: string[] }
   | { type: 'cart/add'; id: string }
   | { type: 'cart/quantity'; id: string; quantity: number }
   | { type: 'cart/remove'; id: string }
