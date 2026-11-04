@@ -10,7 +10,7 @@ import type { BuyerProduct } from './api/discovery';
 
 const first: BuyerProduct = { id: '3', seller_id: '2', name: 'Real vase', shop_name: 'Local maker',
   description: 'A handmade vase', price: '250.00', stock_quantity: 5, category: 'Crafts',
-  delivery_radius_km: 2, image_url: null, is_verified: false, distance_km: 0.14 };
+  delivery_radius_km: 2, image_url: null, is_verified: false, delivery_eligibility: 'CONFIRMED_AT_CHECKOUT' };
 const second: BuyerProduct = { ...first, id: '6', seller_id: '7', name: 'Real candle' };
 const address = { id: 4, user_id: 1, label: 'Home', address_line1: 'Maker Lane', city: 'Mumbai',
   state: 'Maharashtra', pincode: '400001', latitude: '19', longitude: '72', is_default: true };
@@ -74,7 +74,7 @@ it('creates one order per seller with only public fields, quantities and the sel
   fireEvent.click(screen.getByRole('button', { name: 'Place orders' }));
   await screen.findByRole('link', { name: 'View order 10' });
   expect(orderCalls(calls).map(c => c.body)).toEqual([{ seller_id: 2, address_id: 4,
-    items: [{ product_id: 3, quantity: 2 }, { product_id: 8, quantity: 1 }] }]);
+    items: [{ product_id: 3, quantity: 2, expected_unit_price: '250.00' }, { product_id: 8, quantity: 1, expected_unit_price: '250.00' }] }]);
   expect(screen.queryByRole('button', { name: 'Remove Real vase' })).not.toBeInTheDocument();
   expect(screen.getByText('Your local basket is empty')).toBeInTheDocument();
 });
@@ -91,8 +91,8 @@ it('separates sellers with the same display name and preserves failed items on p
   await screen.findByRole('link', { name: 'View order 10' });
   await waitFor(() => expect(screen.getByRole('button', { name: 'Place orders' })).toBeEnabled());
   expect(orderCalls(calls).map(c => c.body)).toEqual([
-    { seller_id: 2, address_id: 4, items: [{ product_id: 3, quantity: 1 }] },
-    { seller_id: 7, address_id: 4, items: [{ product_id: 6, quantity: 1 }] },
+    { seller_id: 2, address_id: 4, items: [{ product_id: 3, quantity: 1, expected_unit_price: '250.00' }] },
+    { seller_id: 7, address_id: 4, items: [{ product_id: 6, quantity: 1, expected_unit_price: '250.00' }] },
   ]);
   expect(screen.queryByRole('button', { name: 'Remove Real vase' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Remove Real candle' })).toBeInTheDocument();
@@ -127,7 +127,7 @@ it('keeps sample products non-orderable alongside real products', async () => {
   await screen.findByRole('link', { name: 'View order 10' });
   expect(screen.getByRole('button', { name: 'Remove Handmade Candle Set' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Checkout unavailable' })).toBeDisabled();
-  expect(orderCalls(calls)[0].body.items).toEqual([{ product_id: 3, quantity: 1 }]);
+  expect(orderCalls(calls)[0].body.items).toEqual([{ product_id: 3, quantity: 1, expected_unit_price: '250.00' }]);
 });
 
 it.each([[403, /address|permission/i], [404, /unavailable|address/i], [409, /stock|availability/i],
@@ -222,7 +222,7 @@ it('saves the key and original public payload before sending the order request',
     const saved = JSON.parse(sessionStorage.getItem('whatnot:order-recovery:1')!);
     expect(saved[0].key).toBe(key);
     expect(saved[0].request).toEqual({ seller_id: String(body.seller_id), address_id: String(body.address_id),
-      items: [{ product_id: '3', quantity: 1 }] });
+      items: [{ product_id: '3', quantity: 1, expected_unit_price: '250.00' }] });
     return [201, { id: 10, total: '250.00' }];
   });
   await selectAddress();

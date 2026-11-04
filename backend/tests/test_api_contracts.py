@@ -39,7 +39,7 @@ def test_openapi_exposes_contracts_and_documents_placeholders(client):
     assert 'address_id' in models['OrderCreate']['required']
     assert 'buyer_id' not in models['OrderCreate']['properties']
     assert set(models["ProductStatus"]["enum"]) == {"PENDING", "APPROVED", "REJECTED"}
-    assert set(models["OrderStatus"]["enum"]) == {"PLACED", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "AWAITING_BUYER_CONFIRMATION", "DELIVERED", "CANCELLED", "REJECTED"}
+    assert set(models["OrderStatus"]["enum"]) == {"PLACED", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED", "DELIVERY_DISPUTED", "CANCELLED", "REJECTED"}
     assert "status" not in models["ProductCreate"]["properties"]
     placeholders = {('/api/v1/products', 'get'), ('/api/v1/products/{product_id}', 'get')}
     for path, methods in schema["paths"].items():
@@ -47,7 +47,12 @@ def test_openapi_exposes_contracts_and_documents_placeholders(client):
             if (path, method) in placeholders:
                 assert '501' in operation['responses']
                 assert 'not implemented' in operation['description'].lower()
-            elif path != '/api/v1/health' and path not in {'/api/v1/auth/register', '/api/v1/auth/login'}:
+            elif (path, method) in {('/api/v1/health','get'),('/api/v1/ready','get'),
+                    ('/api/v1/properties','get'),('/api/v1/properties/{id}','get'),
+                    ('/api/v1/creative/listings','get'),('/api/v1/auth/register','post'),
+                    ('/api/v1/auth/login','post')}:
+                assert not operation.get('security')
+            else:
                 assert operation['security'] == [{'HTTPBearer': []}]
 
 

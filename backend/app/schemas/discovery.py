@@ -1,5 +1,5 @@
 """Explicit-location reads with a minimal buyer-safe product view."""
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
@@ -29,4 +29,4 @@ class BuyerProduct(ProductCreate):
     seller_id: DatabaseId
     shop_name: Name
     is_verified: Annotated[bool, Field(strict=True)]
-    distance_km: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+    delivery_eligibility: Literal['CONFIRMED_AT_CHECKOUT'] = 'CONFIRMED_AT_CHECKOUT'

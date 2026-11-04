@@ -18,7 +18,7 @@ def order_payload(db, records):
     records['seller'].dispatch_location_confirmed_at = datetime.now(timezone.utc)
     db.flush()
     return dict(seller_id=records['seller'].id, address_id=records['address'].id,
-                items=[dict(product_id=records['product'].id, quantity=2)])
+                items=[dict(product_id=records['product'].id, quantity=2, expected_unit_price='250.00')])
 
 
 def assert_no_creation(db, records):
@@ -74,7 +74,7 @@ def test_mixed_seller_products_rejected_atomically(auth_client, db, records, ord
                       stock_quantity=4, category='Crafts', delivery_radius_km=2, status='APPROVED')
     db.add_all([owner, seller, product])
     db.flush()
-    order_payload['items'].append(dict(product_id=product.id, quantity=1))
+    order_payload['items'].append(dict(product_id=product.id, quantity=1, expected_unit_price='10.00'))
     response = auth_client.post('/api/v1/orders', headers=bearer(records['buyer'].id), json=order_payload)
     assert response.status_code == 403
     assert_no_creation(db, records)

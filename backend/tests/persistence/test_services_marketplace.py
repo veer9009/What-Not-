@@ -262,9 +262,9 @@ def test_order_forward_transitions_and_terminal_protection(market):
     order = place(m)
     with pytest.raises(OwnershipError):
         m['orders'].transition(m['admin'].id, order.id, 'ACCEPTED')
-    for status in ['ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'AWAITING_BUYER_CONFIRMATION']:
+    for status in ['ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED']:
         assert m['orders'].transition(m['owner'].id, order.id, status).status == status
-    assert m['orders'].transition(m['buyer'].id, order.id, 'DELIVERED').status == 'DELIVERED'
+    assert m['orders'].transition(m['buyer'].id, order.id, 'COMPLETED').status == 'COMPLETED'
     with pytest.raises(InvalidOrderTransition):
         m['orders'].transition(m['owner'].id, order.id, 'PREPARING')
 

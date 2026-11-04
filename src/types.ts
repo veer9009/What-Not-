@@ -7,7 +7,7 @@ export interface Product {
   rating: number; category: Category; stock: number; description: string; status: ProductStatus;
   image: string; verified: boolean; isActive: boolean; rejectionReason?: string;
   // Only the discovery add action supplies these identifiers; sample IDs never map to API IDs.
-  backend?: { productId: string; sellerId: string };
+  backend?: { productId: string; sellerId: string; unitPrice?:string };
 }
 export interface CartItem { productId: string; quantity: number; placementUncertain?: boolean; placementPending?: boolean }
 export interface SellerOrder { id: string; seller: string; sellerId?: string; items: { product: Product; quantity: number }[]; subtotal: number; delivery: number; total: number }

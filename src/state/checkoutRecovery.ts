@@ -17,11 +17,12 @@ function readAttempts(buyerId: string | undefined, strict: boolean): PlacementAt
       const seller_id = identifier(request.seller_id), address_id = identifier(request.address_id);
       if (!Array.isArray(request.items) || !request.items.length) throw new Error();
       const seen = new Set<string>();
-      const items = request.items.map((item: { product_id: string; quantity: number }) => {
+      const items = request.items.map((item: { product_id: string; quantity: number;expected_unit_price?:string }) => {
         const product_id = identifier(item.product_id);
         if (seen.has(product_id) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 2147483647) throw new Error();
         seen.add(product_id);
-        return { product_id, quantity: item.quantity };
+        if(item.expected_unit_price!==undefined&&(!/^\d{1,10}\.\d{2}$/.test(item.expected_unit_price)||Number(item.expected_unit_price)<=0))throw new Error();
+        return { product_id, quantity: item.quantity,...(item.expected_unit_price===undefined?{}:{expected_unit_price:item.expected_unit_price}) };
       });
       // Restore only public request fields. No token, address coordinates, or prices are stored.
       return { key: entry.key, request: { seller_id, address_id, items },

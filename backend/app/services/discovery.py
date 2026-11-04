@@ -6,6 +6,14 @@ from app.services.addresses import AddressService
 from app.services.errors import ProductNotFound
 from app.services.geography import distance_km, within_radius
 from app.services.users import require_user
+import math
+
+
+def locality_center(latitude, longitude):
+    # A stable ~1.1 km cell. All sellers in a cell have identical discovery
+    # membership; arbitrary query locations cannot recover their private point.
+    return (min(90, math.floor(float(latitude) * 100) / 100 + .005),
+            min(180, math.floor(float(longitude) * 100) / 100 + .005))
 
 
 class DiscoveryService:
@@ -22,14 +30,17 @@ class DiscoveryService:
 
     def _eligible_view(self, product, location):
         seller = product.seller
-        distance = distance_km(location.latitude, location.longitude, seller.latitude, seller.longitude)
-        if not within_radius(distance, product.delivery_radius_km):
+        latitude, longitude = locality_center(seller.latitude, seller.longitude)
+        distance = distance_km(location.latitude, location.longitude, latitude, longitude)
+        # 0.8 km bounds the displacement to the cell centre at the equator.
+        # Discovery is a locality candidate list; checkout alone confirms delivery.
+        if distance > product.delivery_radius_km + .8:
             return None
         return BuyerProduct(id=product.id, seller_id=product.seller_id, name=product.name, description=product.description,
             price=product.price, stock_quantity=product.stock_quantity, category=product.category,
             delivery_radius_km=product.delivery_radius_km,
             image_url=next((i.image_url for i in product.images if i.is_primary), None),
-            shop_name=seller.shop_name, is_verified=seller.is_verified, distance_km=round(distance, 2))
+            shop_name=seller.shop_name, is_verified=seller.is_verified)
 
     def list(self, actor_id: int, query: DiscoveryQuery) -> list[BuyerProduct]:
         query = DiscoveryQuery.model_validate(query)

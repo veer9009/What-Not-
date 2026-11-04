@@ -26,20 +26,20 @@ export function ExploreVerticals({live=false}:{live?:boolean}) {
         <Link className="text-link vertical-action" to={live?'/buyer#homemade-catalogue':'/buyer/samples#homemade-catalogue'}>{live?'Explore nearby Homemade':'Explore Homemade samples'} <ArrowRight size={16}/></Link>
       </article>
       <article className="vertical-card" id="real-estate" aria-labelledby="real-estate-heading">
-        <div className="vertical-card-top"><House size={28} aria-hidden="true"/><span className="scope-badge">Coming soon</span></div>
+        <div className="vertical-card-top"><House size={28} aria-hidden="true"/><span className="scope-badge">Controlled beta</span></div>
         <h3 id="real-estate-heading">Real Estate</h3>
-        <p>Discover local properties available for rent or sale.</p>
-        <ul className="vertical-examples"><li>Example rental property</li><li>Example sale property</li></ul>
-        <p className="vertical-limit">Illustrative examples only. Property listings and enquiries are not available yet.</p>
-        <button className="btn btn-outline vertical-action" disabled>Property listings coming soon</button>
+        <p>Discover local properties available for sale.</p>
+        <ul className="vertical-examples"><li>Residential</li><li>Commercial</li><li>Land/Plots</li></ul>
+        <p className="vertical-limit">Sale listings, enquiries and appointment requests. Ownership and legal documents are not verified by this app.</p>
+        <Link className="btn btn-outline vertical-action" to="/buyer/properties">Explore sale properties</Link>
       </article>
       <article className="vertical-card" id="creative-services" aria-labelledby="creative-heading">
-        <div className="vertical-card-top"><Film size={28} aria-hidden="true"/><span className="scope-badge">Coming soon</span></div>
+        <div className="vertical-card-top"><Film size={28} aria-hidden="true"/><span className="scope-badge">Controlled beta</span></div>
         <h3 id="creative-heading">Creative Services</h3>
         <p>Find video editors, VFX artists and creative professionals.</p>
         <ul className="vertical-examples"><li>Video editing</li><li>Travel video editing</li><li>Influencer reel editing</li><li>VFX service</li></ul>
-        <p className="vertical-limit">Illustrative examples only. Portfolios, bookings and creative requests are not available yet.</p>
-        <button className="btn btn-outline vertical-action" disabled>Creative requests coming soon</button>
+        <p className="vertical-limit">Browse services, request a quote and confirm completed work. No payment or escrow is collected.</p>
+        <Link className="btn btn-outline vertical-action" to="/buyer/creative">Explore Creative Services</Link>
       </article>
     </div>
   </section>;

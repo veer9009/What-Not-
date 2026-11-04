@@ -6,6 +6,7 @@ from app.services.errors import InvalidProductTransition
 from app.services.operations import write_operation
 from app.services.products import require_product
 from app.services.users import pagination, require_user
+from app.models.events import AuditEvent
 
 
 class ModerationService:
@@ -24,9 +25,13 @@ class ModerationService:
         return product
 
     @write_operation
-    def approve(self, admin_id: int, product_id: int):
+    def approve(self, admin_id: int, product_id: int, expected_updated_at=None):
         product = self._pending_locked(admin_id, product_id)
+        if expected_updated_at is not None and product.updated_at != expected_updated_at:
+            raise InvalidProductTransition('Listing changed after review; refresh before approving')
         product.status, product.rejection_reason = 'APPROVED', None
+        self.session.add(AuditEvent(actor_id=admin_id,entity_type='product',entity_id=product.id,
+            action='PRODUCT_APPROVED',previous_status='PENDING',next_status='APPROVED'))
         return product
 
     @write_operation
@@ -34,4 +39,6 @@ class ModerationService:
         reason = ProductRejection(rejection_reason=reason).rejection_reason
         product = self._pending_locked(admin_id, product_id)
         product.status, product.rejection_reason = 'REJECTED', reason
+        self.session.add(AuditEvent(actor_id=admin_id,entity_type='product',entity_id=product.id,
+            action='PRODUCT_REJECTED',previous_status='PENDING',next_status='REJECTED',reason=reason))
         return product

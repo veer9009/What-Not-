@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { setAccessToken } from './api/client';
 const shop={id:2,user_id:1,shop_name:'Ravi Studio',description:null,phone:'1000000001',latitude:'19.000000',longitude:'72.000000',is_verified:false};
-const product={id:3,seller_id:2,name:'Local Candle',description:'Handmade candle',price:'250.00',stock_quantity:2,category:'Crafts',delivery_radius_km:2,image_url:null,status:'REJECTED',rejection_reason:'Improve photo',is_active:true};
+const product={id:3,seller_id:2,name:'Local Candle',description:'Handmade candle',price:'250.00',stock_quantity:2,category:'Crafts',delivery_radius_km:2,image_url:null,status:'REJECTED',rejection_reason:'Improve photo',is_active:true,updated_at:'2026-11-03T12:00:00.123456Z'};
 const address={id:4,user_id:1,label:'Home',address_line1:'Maker Lane',address_line2:null,city:'Mumbai',state:'Maharashtra',pincode:'400001',latitude:'19',longitude:'72',is_default:false};
 const order={id:5,buyer_id:1,seller_id:2,status:'PLACED',subtotal:'250.00',delivery_fee:'0.00',total:'250.00',items:[{product_id:3,seller_id:2,name:'Local Candle',quantity:1,unit_price:'250.00'}]};
 function setup(path:string,role:string,handler:(path:string,method:string,body:any)=>[number,unknown]) {
@@ -54,7 +54,7 @@ describe('integration edge cases',()=>{
   it('separates accepted moderation from a failed refresh',async()=>{
     let accepted=false;setup('/admin','ADMIN',(path,method)=>{if(method==='GET')return accepted?[503,{}]:[200,[{...product,status:'PENDING',rejection_reason:null}]];accepted=true;return [200,{}];});await screen.findByText('Local Candle');await userEvent.click(screen.getByRole('button',{name:'Approve'}));await screen.findByRole('alert');expect(screen.getByRole('status')).toHaveTextContent(/Moderation saved.*Refresh/i);expect(screen.getByRole('button',{name:'Try again'})).toBeInTheDocument();expect(screen.queryByText('Local Candle')).not.toBeInTheDocument();
   });
-  it.each([['PLACED','Reject order','REJECTED','Rejected by seller'],['ACCEPTED','Start preparing','PREPARING','Preparing'],['PREPARING','Out for delivery','OUT_FOR_DELIVERY','Out for delivery'],['OUT_FOR_DELIVERY','Mark as handed over','AWAITING_BUYER_CONFIRMATION','Awaiting buyer confirmation']])('suggests a supported %s seller transition',async(status,label,next,nextLabel)=>{
+  it.each([['PLACED','Reject order','REJECTED','Rejected by seller'],['ACCEPTED','Start preparing','PREPARING','Preparing'],['PREPARING','Out for delivery','OUT_FOR_DELIVERY','Out for delivery'],['OUT_FOR_DELIVERY','Mark delivered','DELIVERED','Delivered']])('suggests a supported %s seller transition',async(status,label,next,nextLabel)=>{
     let changed=false;setup('/seller/orders/5','SELLER',(path,method,body)=>{if(method==='GET')return [200,{...order,status:changed?next:status}];expect(body).toEqual({status:next});changed=true;return [200,{}];});await screen.findByText('Local Candle');await userEvent.click(screen.getByRole('button',{name:label}));await screen.findByText(nextLabel);
   });
 });

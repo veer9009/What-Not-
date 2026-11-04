@@ -1,4 +1,5 @@
 from enum import Enum
+from datetime import datetime
 
 from pydantic import Field, model_validator
 
@@ -10,8 +11,9 @@ class OrderStatus(str, Enum):
     ACCEPTED = "ACCEPTED"
     PREPARING = "PREPARING"
     OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY"
-    AWAITING_BUYER_CONFIRMATION = "AWAITING_BUYER_CONFIRMATION"
     DELIVERED = "DELIVERED"
+    COMPLETED = "COMPLETED"
+    DELIVERY_DISPUTED = "DELIVERY_DISPUTED"
     CANCELLED = "CANCELLED"
     REJECTED = "REJECTED"
 
@@ -19,6 +21,7 @@ class OrderStatus(str, Enum):
 class OrderItem(ContractModel):
     product_id: DatabaseId
     quantity: Quantity
+    expected_unit_price: Price | None = None
 
 
 class OrderCreate(ContractModel):
@@ -36,6 +39,7 @@ class OrderCreate(ContractModel):
 
 
 class OrderItemResponse(OrderItem):
+    expected_unit_price: Price | None = Field(default=None, exclude=True)
     seller_id: DatabaseId
     name: Name
     unit_price: Price
@@ -50,6 +54,10 @@ class OrderResponse(ContractModel):
     subtotal: Money
     delivery_fee: Money
     total: Money
+    delivered_at: datetime | None = None
+    confirmation_deadline: datetime | None = None
+    completed_at: datetime | None = None
+    completion_source: str | None = None
 
     @model_validator(mode="after")
     def check_seller_and_totals(self):
@@ -68,3 +76,13 @@ class OrderStatusUpdate(ContractModel):
     """Accepted values only; permissions and lifecycle transitions need a service."""
 
     status: OrderStatus
+
+
+class FulfillmentResponse(ContractModel):
+    recipient_name: str
+    phone: str
+    address_line1: str
+    address_line2: str | None = None
+    city: str
+    state: str
+    pincode: str

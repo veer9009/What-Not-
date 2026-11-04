@@ -27,7 +27,7 @@ def geographic_order(db, records):
     records['product'].status = 'APPROVED'
     db.flush()
     return dict(seller_id=records['seller'].id, address_id=records['address'].id,
-                items=[dict(product_id=records['product'].id, quantity=2)])
+                items=[dict(product_id=records['product'].id, quantity=2, expected_unit_price='250.00')])
 
 
 def unchanged(db, records, products=()):
@@ -49,7 +49,7 @@ def test_saved_address_radius_matches_discovery(auth_client, db, records, geogra
     headers = bearer(records['buyer'].id)
     detail = auth_client.post(f"/api/v1/discovery/products/{records['product'].id}",
                              headers=headers, json={'address_id': records['address'].id})
-    assert detail.status_code == (200 if inside else 404)
+    assert detail.status_code == 200  # Coarse candidates include points outside the exact checkout radius.
     response = auth_client.post('/api/v1/orders', headers=headers, json=geographic_order)
     assert response.status_code == (201 if inside else 409), response.text
     if inside:
@@ -79,8 +79,7 @@ def test_placement_matches_discovery_at_exact_tolerance(db, records, geographic_
         OrderService(db).create(OrderPlacement(buyer_id=records['buyer'].id, **geographic_order))
         assert records['product'].stock_quantity == 3
     else:
-        with pytest.raises(errors.ProductNotFound):
-            discovery.DiscoveryService(db).get(records['buyer'].id, records['product'].id, source)
+        discovery.DiscoveryService(db).get(records['buyer'].id, records['product'].id, source)
         with pytest.raises(errors.ServiceError, match='outside the selected delivery address'):
             OrderService(db).create(OrderPlacement(buyer_id=records['buyer'].id, **geographic_order))
         unchanged(db, records)
@@ -103,7 +102,7 @@ def test_one_outside_item_rejects_whole_order(auth_client, db, records, geograph
                     status='APPROVED')
     db.add(other)
     db.flush()
-    geographic_order['items'].append(dict(product_id=other.id, quantity=2))
+    geographic_order['items'].append(dict(product_id=other.id, quantity=2, expected_unit_price='100.00'))
     response = auth_client.post('/api/v1/orders', headers=bearer(records['buyer'].id), json=geographic_order)
     assert response.status_code == 409
     assert response.json()['code'] == 'DELIVERY_INELIGIBLE'

@@ -13,6 +13,7 @@ const messages: Record<number,string> = {
   404: 'The requested record was not found.',
   409: 'This operation conflicts with existing data. Refresh and try again. For addresses used by orders, create a replacement address; delivery fields cannot be changed.',
   422: 'Please check the highlighted fields and try again.',
+  429: 'Too many requests. Please wait before trying again.',
   501: 'This feature is awaiting geographic eligibility support.',
 };
 const allowedFields = new Set(['name','email','phone','password','role','shop_name','description','latitude','longitude','price','stock_quantity','category','delivery_radius_km','image_url','rejection_reason','label','address_line1','address_line2','city','state','pincode','is_default','status']);

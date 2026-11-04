@@ -89,7 +89,7 @@ def test_item_order_is_not_a_material_request_change(auth_client, db, records, o
                       stock_quantity=5, category='Crafts', delivery_radius_km=2, status='APPROVED')
     db.add(product)
     db.flush()
-    order_payload['items'].append(dict(product_id=product.id, quantity=1))
+    order_payload['items'].append(dict(product_id=product.id, quantity=1, expected_unit_price='25.00'))
     key = uuid4()
     first = auth_client.post('/api/v1/orders', json=order_payload, headers=headers(records, key))
     changed = {**order_payload, 'items': list(reversed(order_payload['items']))}

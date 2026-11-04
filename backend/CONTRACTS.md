@@ -1,5 +1,24 @@
 # What Not? API contracts
 
+## Controlled beta (current)
+
+The [beta runbook](../docs/BETA_RUNBOOK.md) and generated `/openapi.json` supersede
+the historical phase descriptions below. Checkout is live: `POST /orders` requires
+a UUID4 Idempotency-Key and per-item expected_unit_price; replay returns the original
+snapshot. Sellers mark DELIVERED; buyers choose COMPLETED or DELIVERY_DISPUTED.
+Discovery returns locality candidates with delivery_eligibility=CONFIRMED_AT_CHECKOUT,
+never distance_km or dispatch coordinates. Orders and admin queues support pagination.
+`/notifications` provides recipient-scoped list/count/read/read-all. `/properties`
+implements sale listings, saved listings, reports, enquiries and visits; private
+addresses require explicit authorized reads. `/creative` implements provider/listing,
+RFQ/quote, immutable acceptance, delivery/completion and verified engagement reviews.
+Public approved listing GETs are intentional; all participant/admin writes enforce
+database roles and ownership. API responses use Cache-Control: no-store.
+`/health` is process-only; `/ready` checks schema/storage and reports aggregate backlog.
+See [implementation report](../docs/BETA_IMPLEMENTATION_REPORT.md) for release gates.
+
+## Historical phase notes
+
 Phase 7 adds explicit-location discovery and seller dispatch confirmation. The
 [current location contracts](../docs/PHASE7_LOCATION.md) specify the request/response,
 privacy and boundary rules. Legacy GET product contracts and checkout remain 501.

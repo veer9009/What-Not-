@@ -10,9 +10,9 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
       const p = action.product;
       try { identifier(p.id); identifier(p.seller_id); } catch { return state; }
       const product = { id: `backend:${p.id}`, name: p.name, seller: p.shop_name, price: Number(p.price),
-        distance: p.distance_km, radius: p.delivery_radius_km, stock: p.stock_quantity, category: p.category,
+        distance: 0, radius: p.delivery_radius_km, stock: p.stock_quantity, category: p.category,
         description: p.description, image: p.image_url ?? '', verified: p.is_verified, rating: 0,
-        status: 'APPROVED' as const, isActive: true, backend: { productId: p.id, sellerId: p.seller_id } };
+        status: 'APPROVED' as const, isActive: true, backend: { productId: p.id, sellerId: p.seller_id, unitPrice:p.price } };
       if (!isBuyerEligible(product) || !Number.isFinite(product.price) || product.price <= 0) return state;
       const products = [...state.products.filter(item => item.id !== product.id), product];
       return demoReducer({ ...state, products }, { type: 'cart/add', id: product.id });

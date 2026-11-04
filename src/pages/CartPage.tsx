@@ -61,7 +61,7 @@ export function CartPage() {
     const tasks = uncertain ? attempts : groups.filter(group => group.sellerId).map(group => ({
       seller: group.seller, cartIds: group.items.map(({ product })=>product.id),
       request: { address_id: addressId, seller_id: group.sellerId!,
-        items: group.items.map(({ product, quantity })=>({ product_id: product.backend!.productId, quantity })) },
+        items: group.items.map(({ product, quantity })=>({ product_id: product.backend!.productId, quantity,expected_unit_price:product.backend!.unitPrice??product.price.toFixed(2) })) },
       key: '', pending: false,
     }));
     try {
@@ -79,6 +79,8 @@ export function CartPage() {
               if (current.id !== item.product_id || current.seller_id !== task.request.seller_id)
                 throw new ApiError(404, 'Product is unavailable');
               if (item.quantity > current.stock_quantity) throw new ApiError(409, 'Insufficient stock');
+              if ('expected_unit_price' in item && current.price !== item.expected_unit_price)
+                throw new ApiError(409,'Price changed; refresh the product and accept its current price');
             }
           }
           try {
@@ -129,7 +131,7 @@ export function CartPage() {
     {state.cart.length ? groups.length ? <div className="cart-layout"><div className="cart-list">
       <p className="approval-help">{groups.length} separate seller {groups.length === 1 ? 'order' : 'orders'}. Delivery is Free (₹0). {hasSamples&&'Sample items are illustrative and will not be ordered.'}</p>
       {groups.map(group => <section className="seller-order-group" key={group.sellerId ? `backend:${group.sellerId}` : `sample:${group.seller}`}><h2>{group.seller}{!group.sellerId&&' · Sample, not orderable'}</h2>{group.items.map(({ product, quantity }) => <article className="cart-item" key={product.id}>
-        {product.image?<img src={product.image} alt={product.name}/>:<span aria-hidden="true"/>}<div><p className="eyebrow">{product.seller}</p><h3>{product.name}</h3><span>{product.distance} km away</span></div>
+        {product.image?<img src={product.image} alt={product.name}/>:<span aria-hidden="true"/>}<div><p className="eyebrow">{product.seller}</p><h3>{product.name}</h3><span>{product.backend?'Nearby locality':`${product.distance} km away`}</span></div>
         <div className="quantity"><button aria-label={`Decrease ${product.name} quantity`} disabled={busy || state.cart.some(item => item.productId === product.id && item.placementUncertain) || quantity <= 1} onClick={() => dispatch({ type: 'cart/quantity', id: product.id, quantity: quantity - 1 })}><Minus/></button><b>{quantity}</b><button aria-label={`Increase ${product.name} quantity`} disabled={busy || state.cart.some(item => item.productId === product.id && item.placementUncertain) || quantity >= product.stock} onClick={() => dispatch({ type: 'cart/quantity', id: product.id, quantity: quantity + 1 })}><Plus/></button></div>
         <strong>₹{(product.price * quantity).toLocaleString('en-IN')}</strong><button className="trash" aria-label={`Remove ${product.name}`} disabled={busy || state.cart.some(item => item.productId === product.id && item.placementUncertain)} onClick={() => dispatch({ type: 'cart/remove', id: product.id })}><Trash2/></button>
       </article>)}<p className="seller-order-total">Seller subtotal ₹{group.subtotal.toLocaleString('en-IN')} + delivery Free (₹0) = ₹{group.total.toLocaleString('en-IN')}</p></section>)}

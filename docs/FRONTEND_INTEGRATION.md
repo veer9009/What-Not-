@@ -1,5 +1,15 @@
 # React and FastAPI integration
 
+Current controlled-beta integration supersedes the historical descriptions below.
+Homemade checkout, sale property workflows, Creative Services, notifications and
+admin operations use live APIs for approved accounts. Product samples stay separate.
+Discovery intentionally omits exact distances; checkout confirms eligibility and
+expected prices. Creative uncertain requests retain their original key and private
+payload in account/entity-scoped per-tab sessionStorage for reload recovery. They
+are not server drafts or cross-device recovery; close the tab on shared devices.
+No tokens or precise coordinates are added to this store. See the
+[runbook](BETA_RUNBOOK.md) and [implementation report](BETA_IMPLEMENTATION_REPORT.md).
+
 Phase 7 current location behavior is documented in [PHASE7_LOCATION.md](PHASE7_LOCATION.md).
 It supersedes the Phase 6 sample-discovery/geography limitations below. Real nearby
 routes use explicit buyer choices and confirmed seller dispatch; the separate

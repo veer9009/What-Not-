@@ -29,7 +29,8 @@ def test_transient_and_owned_address_discovery_safe_responses(auth_client, avail
         assert product['id'] == r['product'].id
         assert product['seller_id'] == r['seller'].id
         assert product['shop_name'] == 'Local maker'
-        assert isinstance(product['distance_km'], (float, int))
+        assert 'distance_km' not in product
+        assert product['delivery_eligibility'] == 'CONFIRMED_AT_CHECKOUT'
         assert not {'latitude', 'longitude', 'phone', 'user_id', 'dispatch_location_confirmed_at', 'address_id', 'seller'} & product.keys()
         detail = auth_client.post(f"{PATH}/{r['product'].id}", json=source, headers=headers)
         assert detail.status_code == 200
@@ -65,7 +66,8 @@ def test_each_radius_and_unrounded_outside_point(auth_client, available, db, rad
     def query(longitude):
         return auth_client.post(PATH, json={'location': {'latitude': 0, 'longitude': longitude}}, headers=headers)
     assert len(query(inside).json()) == 1
-    assert query(outside).json() == []
+    assert len(query(outside).json()) == 1  # Exact delivery boundary is private to checkout.
+    assert query(.1).json() == []
 
 
 def test_dispatch_move_changes_next_discovery_request(auth_client, available):
@@ -91,7 +93,7 @@ def test_pagination_after_more_than_100_ineligible_candidates(auth_client, avail
         db.add(product)
         eligible.append(product)
     db.flush()
-    source = {'location': {'latitude': 0, 'longitude': .02}, 'offset': 1, 'limit': 1}
+    source = {'location': {'latitude': 0, 'longitude': .03}, 'offset': 1, 'limit': 1}
     result = auth_client.post(PATH, json=source, headers=bearer(available['buyer'].id))
     assert result.status_code == 200
     assert [p['id'] for p in result.json()] == [eligible[1].id]

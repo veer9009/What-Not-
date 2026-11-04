@@ -80,7 +80,7 @@ def test_admin_moderation_and_seller_order_workflow(auth_client, db, records):
     assert queue.status_code == 200
     product_id = records['product'].id
     assert queue.json()[0]['id'] == product_id
-    assert auth_client.post(f'/api/v1/admin/products/{product_id}/approve', headers=headers).status_code == 200
+    assert auth_client.post(f'/api/v1/admin/products/{product_id}/approve', headers=headers, json={'expected_updated_at':records['product'].updated_at.isoformat()}).status_code == 200
     seller = bearer(records['seller_user'].id)
     updated = auth_client.patch(f'/api/v1/products/{product_id}', headers=seller, json={'name': 'Own edit'})
     assert updated.status_code == 200 and updated.json()['status'] == 'PENDING'

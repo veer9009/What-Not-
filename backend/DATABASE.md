@@ -1,5 +1,12 @@
 # What Not? PostgreSQL foundation — Phase 3
 
+Current beta head is **0008**, a single chain through 0005 shared/order events,
+0006 sale properties, 0007 Creative Services and 0008 quotas/account verification.
+Original 0001–0004 are unchanged. See [beta runbook](../docs/BETA_RUNBOOK.md) for the
+coordinated migration/backup procedure and retention-based rollback refusals.
+Fresh isolated upgrades and metadata checks are required; this work never migrates
+the application database. Remaining phase notes below describe earlier revisions.
+
 Phase 7 current schema revision is **0002**: a nullable timezone-aware
 seller_profiles.dispatch_location_confirmed_at, without default/backfill. Existing
 NUMERIC(9,6) coordinates and radius constraints are reused. Legacy rows remain

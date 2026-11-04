@@ -5,7 +5,7 @@ import { ErrorNotice, Loading } from '../components/ApiStates';
 import { OrderTracking, orderStatusLabels } from '../components/OrderTracking';
 import { ordersApi } from '../api/orders';
 import { errorMessage } from '../api/client';
-import type { OrderStatus } from '../api/types';
+import type { Fulfillment, OrderStatus } from '../api/types';
 import { useResource } from '../state/useResource';
 import { useAuth } from '../state/AuthContext';
 import { supportUrl } from '../utils/support';
@@ -15,24 +15,27 @@ const sellerActions: Partial<Record<OrderStatus, [OrderStatus, string][]>> = {
   PLACED: [['ACCEPTED', 'Accept order'], ['CANCELLED', 'Cancel order'], ['REJECTED', 'Reject order']],
   ACCEPTED: [['PREPARING', 'Start preparing'], ['CANCELLED', 'Cancel order']],
   PREPARING: [['OUT_FOR_DELIVERY', 'Out for delivery']],
-  OUT_FOR_DELIVERY: [['AWAITING_BUYER_CONFIRMATION', 'Mark as handed over']],
+  OUT_FOR_DELIVERY: [['DELIVERED', 'Mark delivered']],
 };
-function statusLabel(status: OrderStatus, role: 'buyer' | 'seller') {
-  return status === 'AWAITING_BUYER_CONFIRMATION' && role === 'seller' ? 'Awaiting buyer confirmation' : orderStatusLabels[status];
+function statusLabel(status: OrderStatus, _role: 'buyer' | 'seller') {
+  return orderStatusLabels[status];
 }
 
 export function OrderHistoryPage() {
   const { user } = useAuth();
   const role = user!.role.toLowerCase() as 'buyer' | 'seller';
-  const resource = useResource(ordersApi.list);
+  const [offset,setOffset]=useState(0);
+  const load=useCallback(()=>ordersApi.list(offset),[offset]);
+  const resource = useResource(load);
   return <DashboardShell role={role}>
     <PageTop eyebrow="Order history" title={role === 'buyer' ? 'Your orders' : 'Incoming orders'}/>
-    <p className="approval-help">Up to 100 orders. Orders placed from your cart appear here. No payment is collected.</p>
+    <p className="approval-help">Newest orders first, 50 per page. No payment is collected.</p>
     {resource.loading ? <Loading/> : resource.error ? <ErrorNotice message={resource.error} retry={() => void resource.reload()}/> : resource.data?.length ?
       <div className="resource-list">{resource.data.map(order => <article className="panel" key={order.id}>
         <h2>Order #{order.id}</h2><p>{statusLabel(order.status, role)}</p><p>₹{order.total}</p>
         <Link className="text-link" to={`/${role}/orders/${order.id}`}>View order {order.id}</Link>
-      </article>)}</div> : <EmptyState title="No orders yet" description="There are no orders to show. Add nearby products to your cart to place an order."/>}
+      </article>)}</div> : <EmptyState title="No orders yet" description="There are no orders on this page. Add nearby products to your cart to place an order."/>}
+    <div className="form-actions"><button className="btn btn-outline" disabled={offset===0||resource.loading} onClick={()=>setOffset(Math.max(0,offset-50))}>Previous orders</button><button className="btn btn-outline" disabled={resource.loading||(resource.data?.length??0)<50} onClick={()=>setOffset(offset+50)}>More orders</button></div>
   </DashboardShell>;
 }
 
@@ -49,6 +52,14 @@ function OrderDetails({ id }: { id: string | undefined }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [fulfillment,setFulfillment]=useState<Fulfillment|null>(null);
+
+  async function loadFulfillment(){
+    if(pending.current||!id)return;
+    pending.current=true;setBusy(true);setError('');
+    try{setFulfillment(await ordersApi.fulfillment(id));}catch(reason){setError(errorMessage(reason));}
+    finally{pending.current=false;setBusy(false);}
+  }
 
   async function transition(status: OrderStatus) {
     if (pending.current || !id) return;
@@ -56,6 +67,7 @@ function OrderDetails({ id }: { id: string | undefined }) {
     setBusy(true); setError(''); setNotice('');
     try {
       await ordersApi.transition(id, status);
+      setFulfillment(null);
       const refreshed = await resource.reload();
       setNotice(refreshed ? 'Order updated.' : 'Order updated. Refresh to see its current status.');
     } catch (reason) {
@@ -77,16 +89,17 @@ function OrderDetails({ id }: { id: string | undefined }) {
       <section className="panel order-details">
         <p className="order-status">{statusLabel(order.status, role)}</p>
         {role === 'buyer' && <OrderTracking status={order.status}/>}
-        {role === 'buyer' && order.status === 'AWAITING_BUYER_CONFIRMATION' && <section className="delivery-confirmation" aria-label="Confirm receipt">
+        {role === 'buyer' && order.status === 'DELIVERED' && <section className="delivery-confirmation" aria-label="Confirm receipt">
           <h2>Have you received your order?</h2>
-          <p>Seller has marked this order as handed over. Have you received your order?</p>
+          <p>Seller has marked this order delivered. Confirm receipt or record a delivery problem.</p>
           <div className="delivery-actions">
-            <button className="btn btn-primary" disabled={busy} onClick={() => void transition('DELIVERED')}>Yes, I received it</button>
-            <a className="btn btn-outline" href={supportUrl(order.id)} target="_blank" rel="noreferrer">I haven't received it / Delivery problem</a>
+            <button className="btn btn-primary" disabled={busy} onClick={() => void transition('COMPLETED')}>Yes, I received it</button>
+            <button className="btn btn-outline" disabled={busy} onClick={() => void transition('DELIVERY_DISPUTED')}>Report not received</button>
           </div>
-          <p className="approval-help">If there is a delivery problem, contact support. Your order will stay awaiting confirmation.</p>
+          <p className="approval-help">Reporting a problem pauses automatic completion and records a dispute for investigation.</p>
         </section>}
-        {role === 'seller' && order.status === 'AWAITING_BUYER_CONFIRMATION' && <p>The buyer needs to confirm receipt to complete this order.</p>}
+        {order.status==='DELIVERED'&&order.confirmation_deadline&&<p>Confirmation deadline: {new Date(order.confirmation_deadline).toLocaleString()}. Without a dispute, this order is eligible for automatic completion after that time.</p>}
+        {role==='seller'&&['ACCEPTED','PREPARING','OUT_FOR_DELIVERY','DELIVERED','DELIVERY_DISPUTED'].includes(order.status)&&<section aria-label="Delivery details"><button className="btn btn-outline" disabled={busy} onClick={()=>void loadFulfillment()}>View delivery details</button>{fulfillment&&<address>{fulfillment.recipient_name}<br/>{fulfillment.phone}<br/>{fulfillment.address_line1}{fulfillment.address_line2&&<><br/>{fulfillment.address_line2}</>}<br/>{fulfillment.city}, {fulfillment.state} {fulfillment.pincode}</address>}</section>}
         {order.items.map(item => <article key={item.product_id}><h3>{item.name}</h3><p>{item.quantity} × ₹{item.unit_price}</p></article>)}
         <p>Subtotal: ₹{order.subtotal}</p><p>Delivery fee: ₹{order.delivery_fee}</p><p><b>Total: ₹{order.total}</b></p>
         <div className="form-actions">{actions.map(([status, label]) => <button className="btn btn-primary" disabled={busy} key={status} onClick={() => void transition(status)}>{label}</button>)}</div>

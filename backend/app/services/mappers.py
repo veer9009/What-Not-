@@ -14,12 +14,14 @@ def product_response(product):
         description=product.description, price=product.price, stock_quantity=product.stock_quantity,
         category=product.category, delivery_radius_km=product.delivery_radius_km,
         image_url=primary, status=product.status, rejection_reason=product.rejection_reason,
-        is_active=product.is_active)
+        is_active=product.is_active,updated_at=product.updated_at)
 
 
 def order_response(order):
     return OrderResponse(id=order.id, buyer_id=order.buyer_id, seller_id=order.seller_id,
         status=order.status, subtotal=order.subtotal, delivery_fee=order.delivery_fee,
+        delivered_at=order.delivered_at, confirmation_deadline=order.confirmation_deadline,
+        completed_at=order.completed_at, completion_source=order.completion_source,
         total=order.total_amount, items=[OrderItemResponse(product_id=item.product_id,
             seller_id=item.seller_id, name=item.product_name, quantity=item.quantity,
             unit_price=item.unit_price) for item in sorted(order.items, key=lambda item: item.product_id)])

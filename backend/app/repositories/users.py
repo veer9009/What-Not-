@@ -12,7 +12,9 @@ class UserRepository:
     def get(self, user_id: int, *, lock=False):
         query = select(User).where(User.id == database_id(user_id))
         if lock:
-            query = query.with_for_update(read=lock == 'shared').execution_options(populate_existing=True)
+            # User identity keys are immutable. NO KEY UPDATE serializes role/
+            # suspension changes while allowing notification recipient FK checks.
+            query = query.with_for_update(read=lock == 'shared',key_share=lock != 'shared').execution_options(populate_existing=True)
         return self.session.scalar(query)
 
     def by_email(self, email: str):

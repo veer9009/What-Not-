@@ -118,7 +118,7 @@ def test_invalid_order_transitions_preserve_stock_and_status(db, market, start, 
     order.status = start
     db.flush()
     # Seller finalization is now forbidden regardless of the current lifecycle stage.
-    with pytest.raises(OwnershipError if end == 'DELIVERED' else InvalidOrderTransition):
+    with pytest.raises(InvalidOrderTransition):
         m['orders'].transition(m['owner'].id, order.id, end)
     assert m['orders'].get(m['buyer'].id, order.id).status == start
     assert m['products'].get(m['product'].id).stock_quantity == 3

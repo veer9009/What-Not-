@@ -18,6 +18,47 @@ class Settings(BaseSettings):
     jwt_secret_key: SecretStr | None = None
     jwt_algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = Field(default=15, ge=1, le=60)
+    delivery_confirmation_grace_hours: int = Field(default=24, ge=1, le=168)
+    property_reconfirmation_days: int = Field(default=30, ge=1, le=90)
+    outbox_batch_size: int = Field(default=50, ge=1, le=100)
+    outbox_lease_seconds: int = Field(default=120, ge=30, le=3600)
+    outbox_max_attempts: int = Field(default=5, ge=1, le=10)
+    outbox_backoff_seconds: int = Field(default=60, ge=1, le=3600)
+    email_provider: Literal['disabled', 'smtp'] = 'disabled'
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str | None = Field(default=None, repr=False)
+    smtp_password: SecretStr | None = None
+    smtp_starttls: bool = True
+    smtp_timeout_seconds: int = Field(default=10, ge=1, le=30)
+    email_from: str | None = None
+    beta_allowed_emails: list[str] = Field(default_factory=list, repr=False)
+    abuse_limits_enabled: bool = True
+    discovery_hourly_limit: int = Field(default=60, ge=1, le=1000)
+    address_daily_limit: int = Field(default=10, ge=1, le=100)
+    checkout_daily_limit: int = Field(default=20, ge=1, le=100)
+    auth_quarter_hour_limit: int = Field(default=20, ge=1, le=100)
+
+    @field_validator('beta_allowed_emails')
+    @classmethod
+    def normalized_beta_accounts(cls, values):
+        from pydantic import EmailStr, TypeAdapter
+        return sorted({str(TypeAdapter(EmailStr).validate_python(value)).lower() for value in values})
+
+    @model_validator(mode='after')
+    def operational_configuration(self):
+        if self.environment == 'production' and (not self.beta_allowed_emails or not self.abuse_limits_enabled):
+            raise ValueError('Production beta requires an explicit account allowlist and abuse controls')
+        if self.email_provider == 'smtp' and (not self.smtp_host or not self.email_from):
+            raise ValueError('SMTP requires host and sender configuration')
+        if self.email_from:
+            from pydantic import EmailStr, TypeAdapter
+            TypeAdapter(EmailStr).validate_python(self.email_from)
+        if self.smtp_host and any(c in self.smtp_host for c in '\r\n'):
+            raise ValueError('Invalid SMTP host')
+        if self.outbox_lease_seconds <= self.smtp_timeout_seconds:
+            raise ValueError('Outbox lease must exceed provider timeout')
+        return self
 
     @field_validator("jwt_secret_key")
     @classmethod

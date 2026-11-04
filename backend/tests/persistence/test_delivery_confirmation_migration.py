@@ -20,8 +20,7 @@ def test_delivery_migration_preserves_history_and_refuses_lossy_downgrade(fresh_
             insert = text('INSERT INTO orders(buyer_id,seller_id,address_id,status,subtotal,delivery_fee,total_amount) VALUES (:buyer,:seller,:address,:status,250,0,250) RETURNING id')
             legacy = connection.scalar(insert, {**values, 'status': 'DELIVERED'})
             active = connection.scalar(insert, {**values, 'status': 'OUT_FOR_DELIVERY'})
-        command.upgrade(config, 'head')
-        command.check(config)
+        command.upgrade(config, '0004')
         with engine.begin() as connection:
             assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0004'
             assert connection.scalar(text('SELECT status FROM orders WHERE id=:id'), {'id': legacy}) == 'DELIVERED'
@@ -38,7 +37,6 @@ def test_delivery_migration_preserves_history_and_refuses_lossy_downgrade(fresh_
         assert next(c for c in inspect(engine).get_columns('orders') if c['name'] == 'status')['type'].length == 20
         with engine.connect() as connection:
             assert connection.scalar(text("SELECT count(*) FROM orders WHERE status='DELIVERED'")) == 2
-        command.upgrade(config, 'head')
-        command.check(config)
+        command.upgrade(config, '0004')
     finally:
         engine.dispose()

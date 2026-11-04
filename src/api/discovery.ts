@@ -6,7 +6,7 @@ export type DiscoverySource = {address_id:Id} | {location:Coordinates};
 export interface BuyerProduct {
   id:Id;seller_id:Id;name:string;description:string;price:string;stock_quantity:number;
   category:Category;delivery_radius_km:1|2|3;image_url:string|null;
-  shop_name:string;is_verified:boolean;distance_km:number;
+  shop_name:string;is_verified:boolean;delivery_eligibility?:'CONFIRMED_AT_CHECKOUT';
 }
 function sourceBody(source:DiscoverySource):string {
   // An ID is validated decimal digits, emitted as a JSON integer without JS number rounding.

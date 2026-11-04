@@ -58,11 +58,13 @@ def get_access_subject(request: Request,
         raise unauthorized() from None
 
 
-def get_current_user(subject: int = Depends(get_access_subject),
+def get_current_user(request: Request, subject: int = Depends(get_access_subject),
                      session: Session = Depends(get_transaction_session, scope='function')) -> User:
     user = UserRepository(session).get(subject)
     if user is None or not user.is_active:
         raise unauthorized()
+    from app.services.abuse import require_beta_admission
+    require_beta_admission(request.app.state.settings,user.email)
     return user
 
 

@@ -1,5 +1,14 @@
 # What Not? database services — Phase 4
 
+Current controlled-beta behavior is described in the [runbook](../docs/BETA_RUNBOOK.md).
+OrderService enforces delivery/dispute/completion, price consent and original replay;
+NotificationService scopes reads/writes to the current recipient. Event publication
+persists notification/outbox inside the business transaction. Email sends run after
+lease commit with finite retries. PropertyService owns separate sale/visit/privacy
+rules and expiry notices; CreativeService owns immutable quotes and buyer completion.
+AdminService exposes reasoned, audited operations. Abuse counters use an independent
+transaction so rejected actions retain quota usage. The sections below are historical.
+
 Phase 7 adds [location/discovery services](../docs/PHASE7_LOCATION.md), which
 supersede the geographic deferrals below. DiscoveryService owns current active
 BUYER/address validation, Haversine eligibility and buyer-safe views. SellerService

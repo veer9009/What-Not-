@@ -7,13 +7,13 @@ import type { DemoState } from '../types';
 
 const product: BuyerProduct = { id: '9223372036854775807', seller_id: '9007199254740993', name: 'Real vase',
   description: 'Real', price: '250.00', stock_quantity: 5, category: 'Crafts', delivery_radius_km: 2,
-  image_url: null, shop_name: 'Maker', is_verified: false, distance_km: 0.14 };
+  image_url: null, shop_name: 'Maker', is_verified: false, delivery_eligibility: 'CONFIRMED_AT_CHECKOUT' };
 const empty: DemoState = { products: [], cart: [], orders: [] };
 
 it('preserves exact backend identifiers separately from the cart display key', () => {
   const state = demoReducer(empty, { type: 'cart/add-discovered', product });
   expect(state.cart).toEqual([{ productId: 'backend:9223372036854775807', quantity: 1 }]);
-  expect(state.products[0].backend).toEqual({ productId: '9223372036854775807', sellerId: '9007199254740993' });
+  expect(state.products[0].backend).toEqual({ productId: '9223372036854775807', sellerId: '9007199254740993', unitPrice: '250.00' });
   expect(createSellerOrders(state.products, state.cart, 'preview')[0].sellerId).toBe('9007199254740993');
 });
 

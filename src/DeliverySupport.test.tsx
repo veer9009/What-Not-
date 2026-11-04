@@ -5,8 +5,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import App from './App';
 import { setAccessToken } from './api/client';
 
-const order = { id: '9007199254740993', buyer_id: 1, seller_id: 2, status: 'AWAITING_BUYER_CONFIRMATION', subtotal: '250.00', delivery_fee: '0.00', total: '250.00', items: [{ product_id: 3, seller_id: 2, name: 'Homemade lunch', quantity: 1, unit_price: '250.00' }] };
-function setup({ role = 'BUYER', status = 'AWAITING_BUYER_CONFIRMATION', path = `/${role.toLowerCase()}/orders/${order.id}`, failure = 0, pending = false, refreshFailure = false, keepStatus = false } = {}) {
+const order = { id: '9007199254740993', buyer_id: 1, seller_id: 2, status: 'DELIVERED', subtotal: '250.00', delivery_fee: '0.00', total: '250.00', items: [{ product_id: 3, seller_id: 2, name: 'Homemade lunch', quantity: 1, unit_price: '250.00' }] };
+function setup({ role = 'BUYER', status = 'DELIVERED', path = `/${role.toLowerCase()}/orders/${order.id}`, failure = 0, pending = false, refreshFailure = false, keepStatus = false } = {}) {
   setAccessToken('private-token');
   let current = status;
   let submitted = false;
@@ -39,11 +39,11 @@ afterEach(() => { setAccessToken(null); vi.unstubAllGlobals(); });
 
 it.each([
   ['PLACED', 'Order placed'], ['ACCEPTED', 'Seller accepted'], ['PREPARING', 'Preparing'],
-  ['OUT_FOR_DELIVERY', 'Out for delivery'], ['AWAITING_BUYER_CONFIRMATION', 'Awaiting your confirmation'], ['DELIVERED', 'Delivered'],
+  ['OUT_FOR_DELIVERY', 'Out for delivery'], ['DELIVERED', 'Delivered'], ['COMPLETED', 'Completed'],
 ])('tracks %s with an accessible current step', async (status, label) => {
   setup({ status });
   const tracking = await screen.findByRole('region', { name: 'Order progress' });
-  expect(within(tracking).getByText(label).closest('li')).toHaveAttribute('aria-current', 'step');
+  expect(within(tracking).getAllByText(label).some(element=>element.closest('li')?.getAttribute('aria-current')==='step')).toBe(true);
   expect(tracking.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
 });
 it.each(['CANCELLED', 'REJECTED'])('does not show a delivery progression for %s', async status => {
@@ -55,30 +55,28 @@ it('confirms receipt through the real API and reloads backend truth', async () =
   const { writes, fetcher } = setup();
   await userEvent.click(await screen.findByRole('button', { name: 'Yes, I received it' }));
   await screen.findByRole('status');
-  expect(writes).toEqual([{ path: '/orders/9007199254740993/status', method: 'PATCH', body: { status: 'DELIVERED' } }]);
+  expect(writes).toEqual([{ path: '/orders/9007199254740993/status', method: 'PATCH', body: { status: 'COMPLETED' } }]);
   expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith(`/orders/${order.id}`))).toHaveLength(2);
   expect(screen.queryByRole('button', { name: 'Yes, I received it' })).not.toBeInTheDocument();
 });
-it.each(['PLACED', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED'])('does not offer confirmation in %s', async status => {
+it.each(['PLACED', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'COMPLETED', 'DELIVERY_DISPUTED'])('does not offer confirmation in %s', async status => {
   setup({ status }); await screen.findByText('Homemade lunch');
   expect(screen.queryByRole('button', { name: 'Yes, I received it' })).not.toBeInTheDocument();
 });
 it('offers seller handover without a final delivery action', async () => {
   const { writes } = setup({ role: 'SELLER', status: 'OUT_FOR_DELIVERY' });
-  await userEvent.click(await screen.findByRole('button', { name: 'Mark as handed over' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Mark delivered' }));
   await screen.findByRole('status');
-  expect(writes[0].body).toEqual({ status: 'AWAITING_BUYER_CONFIRMATION' });
+  expect(writes[0].body).toEqual({ status: 'DELIVERED' });
   expect(screen.queryByRole('button', { name: /mark delivered|Yes, I received it/i })).not.toBeInTheDocument();
 });
-it('delivery problem links to support without submitting a status change', async () => {
+it('records a delivery dispute through the API and removes confirmation actions', async () => {
   const { writes } = setup();
-  const problem = await screen.findByRole('link', { name: "I haven't received it / Delivery problem" });
-  const url = new URL(problem.getAttribute('href')!);
-  expect(url.origin + url.pathname).toBe('https://wa.me/918080098882');
-  expect(url.searchParams.get('text')).toBe('Hi What Not Support, I need help with Order #9007199254740993.');
-  fireEvent.click(problem);
-  expect(writes).toHaveLength(0);
-  expect(screen.getByRole('button', { name: 'Yes, I received it' })).toBeInTheDocument();
+  await userEvent.click(await screen.findByRole('button', { name: 'Report not received' }));
+  await screen.findByRole('status');
+  expect(writes[0].body).toEqual({ status: 'DELIVERY_DISPUTED' });
+  expect(screen.getByText(/Automatic completion is paused/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Yes, I received it' })).not.toBeInTheDocument();
 });
 it('provides order support containing only the public order reference', async () => {
   setup();
@@ -94,8 +92,8 @@ it('discovers dedicated support through buyer navigation with encoded general me
   expect(screen.getByRole('link', { name: 'Chat with What Not Support' })).toHaveAttribute('href', 'https://wa.me/918080098882?text=Hi%20What%20Not%20Support%2C%20I%20need%20help%20with%20my%20marketplace%20account%2Forder.');
 });
 it.each(['BUYER', 'SELLER'])('prevents duplicate pending transitions for %s', async role => {
-  const { writes, release } = setup({ role, status: role === 'SELLER' ? 'OUT_FOR_DELIVERY' : 'AWAITING_BUYER_CONFIRMATION', pending: true });
-  const button = await screen.findByRole('button', { name: role === 'SELLER' ? 'Mark as handed over' : 'Yes, I received it' });
+  const { writes, release } = setup({ role, status: role === 'SELLER' ? 'OUT_FOR_DELIVERY' : 'DELIVERED', pending: true });
+  const button = await screen.findByRole('button', { name: role === 'SELLER' ? 'Mark delivered' : 'Yes, I received it' });
   fireEvent.click(button); fireEvent.click(button);
   expect(button).toBeDisabled(); expect(writes).toHaveLength(1);
   release(); await screen.findByRole('status');
@@ -121,12 +119,12 @@ it('uses the refreshed status rather than assuming the requested status', async 
   await screen.findByRole('status');
   expect(screen.getByRole('button', { name: 'Yes, I received it' })).toBeInTheDocument();
   const tracking = screen.getByRole('region', { name: 'Order progress' });
-  expect(within(tracking).getByText('Awaiting your confirmation').closest('li')).toHaveAttribute('aria-current', 'step');
+  expect(within(tracking).getByText('Delivered').closest('li')).toHaveAttribute('aria-current', 'step');
 });
 it('does not offer the seller a receipt confirmation while awaiting the buyer', async () => {
   setup({ role: 'SELLER' }); await screen.findByText('Homemade lunch');
   expect(screen.queryByRole('button', { name: /received|handed over|delivered/i })).not.toBeInTheDocument();
-  expect(screen.getByText(/buyer needs to confirm receipt/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'View delivery details' })).toBeInTheDocument();
 });
 it.each(['SELLER', 'ADMIN'])('protects buyer Help & Support from %s routes', async role => {
   setup({ role, path: '/buyer/help' });

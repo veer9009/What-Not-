@@ -96,7 +96,7 @@ def test_zero_money_is_allowed_and_precision_is_bounded(db, records):
             db.execute(text("UPDATE products SET price=10000000000.00"))
 
 
-@pytest.mark.parametrize("status", ["PLACED", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "AWAITING_BUYER_CONFIRMATION", "DELIVERED", "CANCELLED", "REJECTED"])
+@pytest.mark.parametrize("status", ["PLACED", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED", "DELIVERY_DISPUTED", "CANCELLED", "REJECTED"])
 def test_valid_order_statuses(db, records, status):
     db.execute(text("UPDATE orders SET status=:status"), {"status": status})
 

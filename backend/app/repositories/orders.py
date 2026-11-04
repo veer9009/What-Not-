@@ -31,11 +31,11 @@ class OrderRepository:
 
     def for_buyer(self, buyer_id: int, offset: int, limit: int):
         return list(self.session.scalars(select(Order).where(Order.buyer_id == database_id(buyer_id))
-            .options(selectinload(Order.items)).order_by(Order.id).offset(offset).limit(limit)))
+            .options(selectinload(Order.items)).order_by(Order.id.desc()).offset(offset).limit(limit)))
 
     def for_seller(self, seller_id: int, offset: int, limit: int):
         return list(self.session.scalars(select(Order).where(Order.seller_id == database_id(seller_id))
-            .options(selectinload(Order.items)).order_by(Order.id).offset(offset).limit(limit)))
+            .options(selectinload(Order.items)).order_by(Order.id.desc()).offset(offset).limit(limit)))
 
     def add(self, order: Order):
         self.session.add(order)

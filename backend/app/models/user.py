@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from sqlalchemy import CheckConstraint, String, true
+from sqlalchemy import CheckConstraint, String, true, DateTime
+from datetime import datetime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, IdMixin, TimestampMixin
 
@@ -21,6 +22,8 @@ class User(IdMixin, TimestampMixin, Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(10))
     is_active: Mapped[bool] = mapped_column(server_default=true())
+    phone_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     seller_profile: Mapped[SellerProfile | None] = relationship(back_populates="user", passive_deletes="all")
     addresses: Mapped[list[Address]] = relationship(back_populates="user", passive_deletes="all")
     orders: Mapped[list[Order]] = relationship(back_populates="buyer", passive_deletes="all")

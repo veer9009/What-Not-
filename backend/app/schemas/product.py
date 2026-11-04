@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import Field, HttpUrl, model_validator
+from pydantic import Field, HttpUrl, model_validator, AwareDatetime
 
 from .common import ContractModel, DatabaseId, MAX_INTEGER, Name, Price
 
@@ -76,6 +76,7 @@ class ProductResponse(ProductCreate):
     status: ProductStatus = ProductStatus.PENDING
     rejection_reason: RejectionReason | None = None
     is_active: Annotated[bool, Field(strict=True)] = True
+    updated_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
     def check_rejection_reason(self):
@@ -88,6 +89,10 @@ class ProductResponse(ProductCreate):
 
 class ProductRejection(ContractModel):
     rejection_reason: RejectionReason
+
+
+class ProductApproval(ContractModel):
+    expected_updated_at: AwareDatetime
 
 
 class ProductActivation(ContractModel):

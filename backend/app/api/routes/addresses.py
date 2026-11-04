@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from app.services.abuse import check_action_limit
 
 from app.api.contracts import IdentifierPath
 from app.api.dependencies import CurrentUser, TransactionSession
@@ -15,7 +16,8 @@ def list_addresses(user: CurrentUser, session: TransactionSession):
 
 
 @router.post('', response_model=AddressResponse, status_code=201, description='Create an address owned by the authenticated user.')
-def create_address(payload: AddressCreate, user: CurrentUser, session: TransactionSession):
+def create_address(payload: AddressCreate, user: CurrentUser, session: TransactionSession, request: Request):
+    check_action_limit(session,request.app.state.settings,'address',user.id)
     return address_response(AddressService(session).create(user.id, payload))
 
 
@@ -25,7 +27,8 @@ def get_address(address_id: IdentifierPath, user: CurrentUser, session: Transact
 
 
 @router.patch('/{address_id}', response_model=AddressResponse, description='Edit only an owned address; preserve delivery fields referenced by orders.')
-def update_address(address_id: IdentifierPath, payload: AddressUpdate, user: CurrentUser, session: TransactionSession):
+def update_address(address_id: IdentifierPath, payload: AddressUpdate, user: CurrentUser, session: TransactionSession, request: Request):
+    check_action_limit(session,request.app.state.settings,'address',user.id)
     return address_response(AddressService(session).update(user.id, address_id, payload))
 
 

@@ -2,14 +2,20 @@
 
 A local marketplace with three business verticals: **Homemade**, **Real Estate**,
 and **Creative Services**. Homemade covers food, handmade products and crafts;
-Real Estate covers rent and sale; Creative Services covers video editing, VFX,
+Real Estate covers sale properties; Creative Services covers creative work,
 and editing for travellers and creators.
 
-Phase 7 adds real Homemade nearby discovery to the authenticated Phase 1–6 workflows.
-Sellers explicitly confirm their business/dispatch point; buyers choose an owned
-address or a temporary manual/device point. The backend enforces product delivery
-radii. Real Estate and Creative Services remain Coming Soon. Checkout and payments
-remain unavailable. Public examples and the separate sample basket stay illustrative.
+The controlled-beta implementation adds locality discovery, real per-seller orders,
+buyer completion/disputes, notifications and a transactional email outbox, sale-only
+property enquiries/visits, Creative Services quotes/engagements, and admin operations.
+Exact delivery eligibility is checked at checkout; public discovery omits precise
+seller distances. Admission is restricted to approved accounts in production.
+No payments, escrow, legal ownership verification or private proof uploads are offered.
+Public sample products remain illustrative and cannot be ordered.
+
+Read the [beta runbook](docs/BETA_RUNBOOK.md) and
+[implementation report](docs/BETA_IMPLEMENTATION_REPORT.md) before release.
+Historical phase reports below describe earlier revisions, not current readiness.
 
 [Phase 7 location guide](docs/PHASE7_LOCATION.md) | [Phase 7 report](docs/PHASE7_REPORT.md)
 

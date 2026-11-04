@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import App from './App';
 import { setAccessToken } from './api/client';
 
-const product={id:3,seller_id:2,name:'Nearby vase',description:'A handmade vase',price:'250.00',stock_quantity:5,category:'Crafts',delivery_radius_km:2,image_url:null,shop_name:'Local maker',is_verified:false,distance_km:0.14};
+const product={id:3,seller_id:2,name:'Nearby vase',description:'A handmade vase',price:'250.00',stock_quantity:5,category:'Crafts',delivery_radius_km:2,image_url:null,shop_name:'Local maker',is_verified:false,delivery_eligibility: 'CONFIRMED_AT_CHECKOUT'};
 const address={id:4,user_id:1,label:'Home',address_line1:'Maker Lane',city:'Mumbai',state:'Maharashtra',pincode:'400001',latitude:'19',longitude:'72',is_default:true};
 type Reply = [number, unknown];
 function setup(handler:(path:string,body:any)=>Reply|Promise<Reply>,path='/buyer'){
@@ -35,7 +35,8 @@ it('requires an explicit source, uses backend list/detail and adds real products
   expect(fetcher.mock.calls.some(([url])=>url.includes('/discovery/'))).toBe(false);
   await manual();
   await screen.findByText('Nearby vase');
-  expect(screen.getByText(/0.14 km/i)).toBeInTheDocument();
+  expect(screen.getByText(/Crafts · Nearby locality/)).toBeInTheDocument();
+  expect(screen.queryByText(/0.14 km/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/sample distance/i)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('link',{name:'View Nearby vase'}));
   await screen.findByRole('heading',{name:'Nearby vase'});

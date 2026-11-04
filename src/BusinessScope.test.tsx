@@ -27,7 +27,7 @@ describe('What Not? business scope', () => {
     const explore = await screen.findByRole('region', { name: 'Explore What Not?' });
     for (const [name, description] of [
       ['Homemade', 'Discover homemade food, handmade products and local creations.'],
-      ['Real Estate', 'Discover local properties available for rent or sale.'],
+      ['Real Estate', 'Discover local properties available for sale.'],
       ['Creative Services', 'Find video editors, VFX artists and creative professionals.'],
     ]) {
       expect(within(explore).getByRole('heading', { name })).toBeInTheDocument();
@@ -36,22 +36,17 @@ describe('What Not? business scope', () => {
     expect(within(explore).getByRole('link', { name: path === '/buyer' ? 'Explore nearby Homemade' : 'Explore Homemade samples' })).toHaveAttribute('href', path === '/buyer' ? '/buyer#homemade-catalogue' : '/buyer/samples#homemade-catalogue');
   });
 
-  it('keeps property and creative previews separate from product commerce', () => {
+  it('links sale properties and creative work separately from product commerce', () => {
     const fetcher = open();
     const property = screen.getByRole('article', { name: 'Real Estate' });
     const creative = screen.getByRole('article', { name: 'Creative Services' });
-    expect(within(property).getByText('Coming soon')).toBeInTheDocument();
-    expect(within(creative).getByText('Coming soon')).toBeInTheDocument();
-    expect(within(property).getByText('Example rental property')).toBeInTheDocument();
-    expect(within(property).getByText('Example sale property')).toBeInTheDocument();
-    for (const name of ['Video editing', 'Travel video editing', 'Influencer reel editing', 'VFX service']) {
-      expect(within(creative).getByText(name)).toBeInTheDocument();
-    }
-    for (const card of [property, creative]) {
-      expect(within(card).getByText(/Illustrative examples only/)).toBeInTheDocument();
-      expect(within(card).queryByRole('link')).not.toBeInTheDocument();
-      within(card).getAllByRole('button').forEach(button => expect(button).toBeDisabled());
-    }
+    expect(within(property).getByText('Controlled beta')).toBeInTheDocument();
+    expect(within(creative).getByText('Controlled beta')).toBeInTheDocument();
+    expect(within(property).queryByText(/rental/i)).not.toBeInTheDocument();
+    expect(within(property).getByRole('link')).toHaveAttribute('href','/buyer/properties');
+    expect(within(creative).getByRole('link')).toHaveAttribute('href','/buyer/creative');
+    expect(within(property).getByText(/legal documents are not verified/)).toBeInTheDocument();
+    expect(within(creative).getByText(/No payment or escrow/)).toBeInTheDocument();
     expect(fetcher).not.toHaveBeenCalled();
   });
 

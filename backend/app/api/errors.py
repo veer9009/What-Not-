@@ -6,9 +6,17 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.security import AuthenticationUnavailable, InvalidCredentials
 from app.services import errors
+from app.services.abuse import RateLimitExceeded
+import logging
+
+logger = logging.getLogger('whatnot.api')
 
 
 def install_error_handlers(app):
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_error(request, exc):
+        return JSONResponse(status_code=429, content={'detail':'Request limit reached; retry later'},
+                            headers={'Retry-After':str(exc.retry_after),'Cache-Control':'no-store'})
     @app.exception_handler(InvalidCredentials)
     async def credentials_error(request, exc):
         return JSONResponse(status_code=401, content={'detail': 'Invalid authentication credentials'},
@@ -20,6 +28,7 @@ def install_error_handlers(app):
 
     @app.exception_handler(errors.ServiceError)
     async def domain_error(request, exc):
+        logger.warning('domain_request_rejected', extra={'error_code':type(exc).__name__})
         if isinstance(exc, errors.InactiveUser):
             return JSONResponse(status_code=401, content={'detail': 'Invalid authentication credentials'},
                                 headers={'WWW-Authenticate': 'Bearer'})
@@ -39,6 +48,7 @@ def install_error_handlers(app):
 
     @app.exception_handler(SQLAlchemyError)
     async def storage_error(request, exc):
+        logger.error('storage_operation_failed', extra={'error_code':type(exc).__name__})
         return JSONResponse(status_code=503, content={'detail': 'Storage operation is unavailable'})
 
     @app.exception_handler(RequestValidationError)
@@ -52,4 +62,5 @@ def install_error_handlers(app):
     @app.exception_handler(ResponseValidationError)
     @app.exception_handler(ValidationError)
     async def response_error(request, exc):
+        logger.error('response_validation_failed', extra={'error_code':type(exc).__name__})
         return JSONResponse(status_code=500, content={'detail': 'Response could not be produced'})

@@ -2,13 +2,14 @@ import type { OrderStatus } from '../api/types';
 
 export const orderStatusLabels: Record<OrderStatus, string> = {
   PLACED: 'Order placed', ACCEPTED: 'Seller accepted', PREPARING: 'Preparing',
-  OUT_FOR_DELIVERY: 'Out for delivery', AWAITING_BUYER_CONFIRMATION: 'Awaiting your confirmation',
-  DELIVERED: 'Delivered', CANCELLED: 'Cancelled', REJECTED: 'Rejected by seller',
+  OUT_FOR_DELIVERY: 'Out for delivery',
+  DELIVERED: 'Delivered', COMPLETED: 'Completed', DELIVERY_DISPUTED: 'Delivery disputed', CANCELLED: 'Cancelled', REJECTED: 'Rejected by seller',
 };
 
-const stages: OrderStatus[] = ['PLACED', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'AWAITING_BUYER_CONFIRMATION', 'DELIVERED'];
+const stages: OrderStatus[] = ['PLACED', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'];
 
 export function OrderTracking({ status }: { status: OrderStatus }) {
+  if (status === 'DELIVERY_DISPUTED') return <p className="order-ended">Delivery disputed. Automatic completion is paused while support investigates.</p>;
   if (status === 'CANCELLED' || status === 'REJECTED') {
     return <p className="order-ended">{status === 'CANCELLED' ? 'This order was cancelled.' : 'The seller could not accept this order.'} Delivery tracking has ended.</p>;
   }

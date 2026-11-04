@@ -12,36 +12,36 @@ from test_service_concurrency import concurrency_engine, seed, race_while_locked
 def test_seller_handover_then_buyer_confirmation_preserves_inventory(market):
     m = market
     order = place(m)
-    for status in ['ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'AWAITING_BUYER_CONFIRMATION']:
+    for status in ['ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED']:
         assert m['orders'].transition(m['owner'].id, order.id, status).status == status
     with pytest.raises(OwnershipError):
-        m['orders'].transition(m['owner'].id, order.id, 'DELIVERED')
-    assert m['orders'].transition(m['buyer'].id, order.id, 'DELIVERED').status == 'DELIVERED'
+        m['orders'].transition(m['owner'].id, order.id, 'COMPLETED')
+    assert m['orders'].transition(m['buyer'].id, order.id, 'COMPLETED').status == 'COMPLETED'
     with pytest.raises(InvalidOrderTransition):
-        m['orders'].transition(m['buyer'].id, order.id, 'DELIVERED')
+        m['orders'].transition(m['buyer'].id, order.id, 'COMPLETED')
     assert m['products'].get(m['product'].id).stock_quantity == 3
 
 
-@pytest.mark.parametrize('start', ['PLACED', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'REJECTED'])
+@pytest.mark.parametrize('start', ['PLACED', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'COMPLETED', 'CANCELLED', 'REJECTED'])
 def test_buyer_confirmation_rejects_every_other_status(db, market, start):
     m = market
     order = place(m)
     order.status = start
     db.flush()
     with pytest.raises(InvalidOrderTransition):
-        m['orders'].transition(m['buyer'].id, order.id, 'DELIVERED')
+        m['orders'].transition(m['buyer'].id, order.id, 'COMPLETED')
     assert m['orders'].get(m['buyer'].id, order.id).status == start
     assert m['products'].get(m['product'].id).stock_quantity == 3
 
 
-@pytest.mark.parametrize('start', ['OUT_FOR_DELIVERY', 'AWAITING_BUYER_CONFIRMATION'])
+@pytest.mark.parametrize('start', ['OUT_FOR_DELIVERY', 'DELIVERED'])
 def test_seller_cannot_finalize_delivery(db, market, start):
     m = market
     order = place(m)
     order.status = start
     db.flush()
     with pytest.raises(OwnershipError):
-        m['orders'].transition(m['owner'].id, order.id, 'DELIVERED')
+        m['orders'].transition(m['owner'].id, order.id, 'COMPLETED')
     assert m['orders'].get(m['buyer'].id, order.id).status == start
 
 
@@ -49,21 +49,21 @@ def test_seller_cannot_finalize_delivery(db, market, start):
 def test_unrelated_actor_cannot_confirm_receipt(db, market, role):
     m = market
     order = place(m)
-    order.status = 'AWAITING_BUYER_CONFIRMATION'
+    order.status = 'DELIVERED'
     actor = User(name='Other', email='other-receipt@example.test', phone='other-receipt',
                  password_hash='test-only-hash', role=role)
     db.add(actor)
     db.flush()
     with pytest.raises(OwnershipError):
-        m['orders'].transition(actor.id, order.id, 'DELIVERED')
-    assert m['orders'].get(m['buyer'].id, order.id).status == 'AWAITING_BUYER_CONFIRMATION'
+        m['orders'].transition(actor.id, order.id, 'COMPLETED')
+    assert m['orders'].get(m['buyer'].id, order.id).status == 'DELIVERED'
 
 
 @pytest.mark.parametrize('actor,status,want', [
-    ('seller_user', 'AWAITING_BUYER_CONFIRMATION', 200),
-    ('seller_user', 'DELIVERED', 403),
-    ('buyer', 'AWAITING_BUYER_CONFIRMATION', 403),
-    ('buyer', 'DELIVERED', 409),
+    ('seller_user', 'DELIVERED', 200),
+    ('seller_user', 'COMPLETED', 403),
+    ('buyer', 'DELIVERED', 403),
+    ('buyer', 'COMPLETED', 409),
 ])
 def test_status_api_handover_contract(auth_client, db, records, actor, status, want):
     order = records['order']
@@ -78,34 +78,34 @@ def test_status_api_handover_contract(auth_client, db, records, actor, status, w
 
 def test_status_api_buyer_completion_and_duplicate(auth_client, db, records):
     order = records['order']
-    order.status = 'AWAITING_BUYER_CONFIRMATION'
+    order.status = 'DELIVERED'
     db.flush()
     path = f'/api/v1/orders/{order.id}/status'
     headers = bearer(records['buyer'].id)
-    response = auth_client.patch(path, headers=headers, json={'status': 'DELIVERED'})
-    assert response.status_code == 200 and response.json()['status'] == 'DELIVERED'
-    assert auth_client.patch(path, headers=headers, json={'status': 'DELIVERED'}).status_code == 409
+    response = auth_client.patch(path, headers=headers, json={'status': 'COMPLETED'})
+    assert response.status_code == 200 and response.json()['status'] == 'COMPLETED'
+    assert auth_client.patch(path, headers=headers, json={'status': 'COMPLETED'}).status_code == 409
     assert records['product'].stock_quantity == 5
 
 
 @pytest.mark.parametrize('role', ['BUYER', 'SELLER', 'ADMIN'])
 def test_status_api_other_users_cannot_confirm(auth_client, db, records, role):
-    records['order'].status = 'AWAITING_BUYER_CONFIRMATION'
+    records['order'].status = 'DELIVERED'
     actor = User(name='Other', email='other-http@example.test', phone='other-http', password_hash='test-only-hash', role=role)
     db.add(actor)
     db.flush()
     path = f"/api/v1/orders/{records['order'].id}/status"
-    assert auth_client.patch(path, headers=bearer(actor.id), json={'status': 'DELIVERED'}).status_code == 403
-    assert records['order'].status == 'AWAITING_BUYER_CONFIRMATION'
+    assert auth_client.patch(path, headers=bearer(actor.id), json={'status': 'COMPLETED'}).status_code == 403
+    assert records['order'].status == 'DELIVERED'
 
 
 def test_legacy_delivered_order_remains_readable(auth_client, db, records):
-    records['order'].status = 'DELIVERED'
+    records['order'].status = 'COMPLETED'
     db.flush()
     for actor in ['buyer', 'seller_user']:
         headers = bearer(records[actor].id)
-        assert auth_client.get(f"/api/v1/orders/{records['order'].id}", headers=headers).json()['status'] == 'DELIVERED'
-        assert auth_client.get('/api/v1/orders', headers=headers).json()[0]['status'] == 'DELIVERED'
+        assert auth_client.get(f"/api/v1/orders/{records['order'].id}", headers=headers).json()['status'] == 'COMPLETED'
+        assert auth_client.get('/api/v1/orders', headers=headers).json()[0]['status'] == 'COMPLETED'
 
 
 def test_duplicate_handover_is_conflict_and_stock_unchanged(db, market):
@@ -113,9 +113,9 @@ def test_duplicate_handover_is_conflict_and_stock_unchanged(db, market):
     order = place(m)
     order.status = 'OUT_FOR_DELIVERY'
     db.flush()
-    m['orders'].transition(m['owner'].id, order.id, 'AWAITING_BUYER_CONFIRMATION')
+    m['orders'].transition(m['owner'].id, order.id, 'DELIVERED')
     with pytest.raises(InvalidOrderTransition):
-        m['orders'].transition(m['owner'].id, order.id, 'AWAITING_BUYER_CONFIRMATION')
+        m['orders'].transition(m['owner'].id, order.id, 'DELIVERED')
     assert m['products'].get(m['product'].id).stock_quantity == 3
 
 
@@ -123,7 +123,7 @@ def test_duplicate_handover_is_conflict_and_stock_unchanged(db, market):
 def test_handover_cannot_be_cancelled_or_rejected(db, market, status):
     m = market
     order = place(m)
-    order.status = 'AWAITING_BUYER_CONFIRMATION'
+    order.status = 'DELIVERED'
     db.flush()
     with pytest.raises(InvalidOrderTransition):
         m['orders'].transition(m['owner'].id, order.id, status)
@@ -131,8 +131,8 @@ def test_handover_cannot_be_cancelled_or_rejected(db, market, status):
 
 
 @pytest.mark.parametrize('actor,start,target', [
-    ('owner', 'OUT_FOR_DELIVERY', 'AWAITING_BUYER_CONFIRMATION'),
-    ('buyer', 'AWAITING_BUYER_CONFIRMATION', 'DELIVERED'),
+    ('owner', 'OUT_FOR_DELIVERY', 'DELIVERED'),
+    ('buyer', 'DELIVERED', 'COMPLETED'),
 ])
 def test_concurrent_delivery_transitions_apply_once(concurrency_engine, actor, start, target):
     from sqlalchemy import select
@@ -163,5 +163,5 @@ def test_concurrent_delivery_transitions_apply_once(concurrency_engine, actor, s
 
 
 def test_unauthenticated_confirmation_rejected(auth_client, records):
-    response = auth_client.patch(f"/api/v1/orders/{records['order'].id}/status", json={'status': 'DELIVERED'})
+    response = auth_client.patch(f"/api/v1/orders/{records['order'].id}/status", json={'status': 'COMPLETED'})
     assert response.status_code == 401

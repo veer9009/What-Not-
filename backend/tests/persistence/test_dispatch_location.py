@@ -81,15 +81,13 @@ def test_confirmation_migration_preserves_legacy_rows(fresh_database_url):
         with engine.begin() as connection:
             uid = connection.scalar(text("INSERT INTO users(name,email,phone,password_hash,role) VALUES ('Legacy','legacy@example.com','legacy','hash','SELLER') RETURNING id"))
             connection.execute(text("INSERT INTO seller_profiles(user_id,shop_name,phone,latitude,longitude) VALUES (:uid,'Legacy','legacy',19,72)"), {'uid': uid})
-        command.upgrade(config, 'head')
+        command.upgrade(config, '0002')
         assert 'dispatch_location_confirmed_at' in {c['name'] for c in inspect(engine).get_columns('seller_profiles')}
         with engine.connect() as connection:
             row = connection.execute(text('SELECT latitude,longitude,dispatch_location_confirmed_at FROM seller_profiles')).one()
             assert tuple(row) == (Decimal('19'), Decimal('72'), None)
-        command.check(config)
         command.downgrade(config, '0001')
-        command.upgrade(config, 'head')
-        command.check(config)
+        command.upgrade(config, '0002')
         with engine.connect() as connection:
             assert connection.scalar(text('SELECT count(*) FROM seller_profiles')) == 1
     finally:
