@@ -20,9 +20,9 @@ async function connect(url){
   ws.onmessage=event=>{const value=JSON.parse(event.data);if(value.id){const item=calls.get(value.id);calls.delete(value.id);value.error?item.reject(new Error(value.error.message)):item.resolve(value.result);}};
   return(method,params={})=>new Promise((resolve,reject)=>{const id=++sequence;calls.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
 }
-async function evaluate(cdp,expression){const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(r.exceptionDetails.text);return r.result.value;}
+async function evaluate(cdp,expression){const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description??r.exceptionDetails.text);return r.result.value;}
 async function wait(cdp,expression){for(let i=0;i<100;i++){if(await evaluate(cdp,expression))return;await sleep(100);}throw new Error('Browser condition timed out: '+expression+'; page text: '+(await evaluate(cdp,'document.body.innerText')).slice(0,2000));}
-async function text(cdp,value){await wait(cdp,`document.body.textContent.includes(${JSON.stringify(value)})`);}
+async function text(cdp,value){await wait(cdp,`Boolean(document.body?.textContent?.includes(${JSON.stringify(value)}))`);}
 async function click(cdp,label,tag='button'){
   const selector=JSON.stringify(tag),name=JSON.stringify(label);
   await wait(cdp,`[...document.querySelectorAll(${selector})].some(e=>e.textContent.trim()===${name}&&!e.disabled)`);
@@ -53,6 +53,34 @@ try{
   for(let i=0;i<100;i++){try{port=Number((await readFile(join(profile,'DevToolsActivePort'),'utf8')).split('\n')[0]);break;}catch{await sleep(100);}}
   if(!port)throw new Error('Headless Edge debugging did not start');
   const version=await(await fetch(`http://127.0.0.1:${port}/json/version`)).json();browser=await connect(version.webSocketDebuggerUrl);
+  // Public policy routes, real keyboard focus, responsive reflow and browser AX names.
+  const legalTarget=await browser('Target.createTarget',{url:'about:blank'});
+  const legalTargets=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+  const legal=await connect(legalTargets.find(t=>t.id===legalTarget.targetId).webSocketDebuggerUrl);
+  for(const width of [320,390,768,1280]){
+    await legal('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<768});
+    for(const path of ['/privacy','/terms','/cookies','/refunds','/contact','/support']){
+      await legal('Page.navigate',{url:`http://127.0.0.1:8000${path}`});
+      await wait(legal,`document.readyState==='complete' && location.pathname===${JSON.stringify(path)} && Boolean(document.querySelector('main h1'))`);
+      await text(legal,'OWNER INPUT REQUIRED BEFORE PUBLIC LAUNCH');
+      if(!await evaluate(legal,"document.querySelector('main h1') && document.querySelector('nav[aria-label=\"Legal and support\"]') && document.documentElement.scrollWidth<=innerWidth"))throw new Error(`Legal route overflow/semantics: ${path} at ${width}`);
+      if(await evaluate(legal,"document.cookie || localStorage.length || sessionStorage.length"))throw new Error('Unexpected public-route storage');
+      const ax=await legal('Accessibility.getFullAXTree');
+      const unnamed=ax.nodes.filter(n=>!n.ignored&&['button','link'].includes(n.role?.value)&&!n.name?.value?.trim());
+      if(unnamed.length)throw new Error('Unnamed policy controls in browser accessibility tree');
+    }
+  }
+  await legal('Page.navigate',{url:'http://127.0.0.1:8000/privacy'});
+  await wait(legal,"document.readyState==='complete' && location.pathname==='/privacy' && Boolean(document.querySelector('main h1'))");await text(legal,'Privacy Policy');
+  await legal('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+  await legal('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+  if(!await evaluate(legal,"document.activeElement.textContent==='Skip to main content'"))throw new Error('Skip link is not first keyboard stop');
+  await legal('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  await legal('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  await wait(legal,"document.activeElement.id==='main-content'");
+  await evaluate(legal,"document.body.style.zoom='2'");
+  if(!await evaluate(legal,'document.documentElement.scrollWidth<=innerWidth'))throw new Error('Legal page overflows at 200% zoom');
+  console.log('PASS: six logged-out legal routes at 320/390/768/1280, named AX controls, no public storage, keyboard skip/Enter, 200% zoom');
   const buyer=await page('BUYER','Buyer'),other=await page('BUYER','OtherBuyer'),seller=await page('SELLER','Seller'),otherSeller=await page('SELLER','OtherSeller'),admin=await page('ADMIN','Admin');
   // Five distinct real browser tabs and actual database-backed authentication.
   await navigate(other,`/buyer/orders/${fixture.orders[0]}`);await text(other,'You do not have permission');
@@ -60,7 +88,12 @@ try{
   for(const [index,id] of fixture.orders.entries()){
     await navigate(seller,`/seller/orders/${id}`);await click(seller,'Accept order');await click(seller,'View delivery details');await text(seller,'Synthetic delivery lane');
     await click(seller,'Start preparing');await click(seller,'Out for delivery');await click(seller,'Mark delivered');
-    await navigate(buyer,`/buyer/orders/${id}`);await click(buyer,index===0?'Yes, I received it':'Report not received');await text(buyer,index===0?'Completed':'Delivery disputed');
+    // A DOM click does not await the API commit. Wait for authoritative seller
+    // reload before the buyer's one-shot fetch; do not rely on the 100ms route delay.
+    await wait(seller,"document.querySelector('.order-status')?.textContent==='Delivered'");
+    await navigate(buyer,`/buyer/orders/${id}`);await click(buyer,index===0?'Yes, I received it':'Report not received');
+    // The tracking list always contains a future 'Completed' label; scope to status.
+    await wait(buyer,`document.querySelector('.order-status')?.textContent===${JSON.stringify(index===0?'Completed':'Delivery disputed')}`);
   }
   await navigate(admin,'/admin/operations');await fill(admin,'textarea[aria-label="Investigation reason"]','Browser investigated synthetic delivery');await click(admin,`Resolve cancelled #${fixture.orders[1]}`);await text(admin,'Action recorded');
   await navigate(buyer,'/buyer/notifications');await text(buyer,'Order update');await click(buyer,'Mark all as read');await text(buyer,'0 unread');
@@ -71,7 +104,16 @@ try{
   const appointment=new Date(Date.now()+86400000).toISOString().slice(0,16);await fill(buyer,'input[type="datetime-local"]',appointment);await click(buyer,'Request visit');await text(buyer,'Saved.');
   await navigate(seller,'/seller/properties/requests');await text(seller,'Browser enquiry');await fill(seller,'textarea','Browser reply');await click(seller,'Send response');await click(seller,'ACCEPT');await text(seller,'CONFIRMED');
   await navigate(buyer,'/buyer/properties/requests');await text(buyer,'Browser reply');await click(buyer,'View appointment address');await text(buyer,'Synthetic private property lane');
-  await navigate(seller,'/seller/properties');await click(seller,'Mark sold');await text(seller,'Saved.');await click(buyer,'Reload requests');await text(buyer,'CANCELLED');
+  await navigate(seller,'/seller/properties');
+  await wait(seller,"document.querySelector('input')?.value==='Browser Owner'");
+  for(const enabled of [true,false]){
+    await evaluate(seller,"document.querySelector('input[type=checkbox]').click()");
+    await click(seller,'Save property profile');await text(seller,'Saved.');
+    await navigate(seller,'/seller/notifications');await navigate(seller,'/seller/properties');
+    await wait(seller,`document.querySelector('input')?.value==='Browser Owner' && document.querySelector('input[type=checkbox]')?.checked===${enabled}`);
+  }
+  console.log('PASS: saved property phone-sharing preference and withdrawal persist after reload');
+  await click(seller,'Mark sold');await text(seller,'Saved.');await click(buyer,'Reload requests');await text(buyer,'CANCELLED');
   if(await evaluate(buyer,"document.body.innerText.includes('Synthetic private property lane')"))throw new Error('Sold appointment address remained visible');
   console.log('PASS: sale enquiry/reply, visit confirmation, private-address gate and sale revocation');
   await navigate(buyer,'/buyer/creative');await text(buyer,'Browser video edit');await fill(buyer,'textarea[name=text]','Browser edit please');await click(buyer,'Send private enquiry');await text(buyer,'Saved.');

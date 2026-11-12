@@ -18,8 +18,11 @@ import { AdminOperationsPage, CreativeModerationPage } from './pages/AdminOperat
 import { BuyerCreativePage, SellerCreativePage } from './pages/CreativePages';
 import { PropertyBrowsePage, PropertyDetailPage, PropertyManagePage, PropertyRequestsPage, PropertyModerationPage } from './pages/PropertyPages';
 import type { Role } from './api/types';
+import { LegalPage } from './pages/LegalPages';
+import { LegalFooter } from './components/LegalNavigation';
 function RequireRole({role}:{role:Role}){const auth=useAuth();if(auth.loading)return <Loading/>;if(!auth.user)return <Navigate to={role==='ADMIN'?'/admin/login':`/login/${role.toLowerCase()}`} replace/>;if(auth.user.role!==role)return <div className="permission-page"><h1>This page is not available for your account.</h1><Link className="btn btn-primary" to={roleHome(auth.user.role)}>Open your workspace</Link></div>;return <Outlet/>;}
 function Application(){const {user}=useAuth();return <DiscoveryProvider key={user?`${user.id}:${user.role}`:'anonymous'}><DemoProvider ownerId={user?.role==='BUYER'?user.id:undefined} key={user?`${user.id}:${user.role}`:"anonymous"}><Routes>
+  <Route path="/privacy" element={<LegalPage kind="privacy"/>}/><Route path="/terms" element={<LegalPage kind="terms"/>}/><Route path="/cookies" element={<LegalPage kind="cookies"/>}/><Route path="/refunds" element={<LegalPage kind="refunds"/>}/><Route path="/contact" element={<LegalPage kind="contact"/>}/><Route path="/support" element={<LegalPage kind="contact"/>}/>
   <Route path="/" element={<LandingPage/>}/><Route path="/login" element={<RoleSelectionPage/>}/><Route path="/login/:role" element={<LoginPage/>}/><Route path="/register" element={<RegisterPage/>}/>
   <Route path="/admin/login" element={<LoginPage administration/>}/><Route path="/login/admin" element={<Navigate to="/admin/login" replace/>}/>
   <Route element={<RequireRole role="BUYER"/>}><Route path="/buyer" element={<BuyerDiscoveryPage/>}/><Route path="/buyer/samples" element={<BuyerDashboard/>}/><Route path="/buyer/samples/products/:id" element={<ProductDetailsPage/>}/><Route path="/buyer/profile" element={<BuyerProfilePage/>}/><Route path="/buyer/products/:id" element={<DiscoveryDetailPage/>}/><Route path="/buyer/cart" element={<CartPage/>}/><Route path="/buyer/addresses" element={<AddressPage/>}/><Route path="/buyer/orders" element={<OrderHistoryPage/>}/><Route path="/buyer/orders/:id" element={<OrderDetailsPage/>}/></Route>
@@ -31,5 +34,5 @@ function Application(){const {user}=useAuth();return <DiscoveryProvider key={use
   <Route element={<RequireRole role="SELLER"/>}><Route path="/seller" element={<SellerDashboard/>}/><Route path="/seller/profile" element={<SellerProfilePage/>}/><Route path="/seller/products/new" element={<ProductFormPage/>}/><Route path="/seller/products/:id/edit" element={<ProductFormPage/>}/><Route path="/seller/addresses" element={<AddressPage/>}/><Route path="/seller/orders" element={<OrderHistoryPage/>}/><Route path="/seller/orders/:id" element={<OrderDetailsPage/>}/></Route>
   <Route element={<RequireRole role="ADMIN"/>}><Route path="/admin" element={<AdminDashboard/>}/><Route path="/admin/addresses" element={<AddressPage/>}/></Route>
   <Route path="*" element={<Navigate to="/" replace/>}/>
-  </Routes><WhatsAppButton/></DemoProvider></DiscoveryProvider>;}
-export default function App(){return <AuthProvider><Application/></AuthProvider>;}
+  </Routes><LegalFooter/><WhatsAppButton/></DemoProvider></DiscoveryProvider>;}
+export default function App(){return <AuthProvider><a className="skip-link" href="#main-content" onClick={()=>document.getElementById('main-content')?.focus()}>Skip to main content</a><Application/></AuthProvider>;}

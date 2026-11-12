@@ -1,0 +1,144 @@
+{
+  "checks": [
+    {
+      "name": "body",
+      "fg": "#292521",
+      "bg": "#fff8ef",
+      "target": 4.5,
+      "ratio": 14.43,
+      "pass": true
+    },
+    {
+      "name": "muted on white",
+      "fg": "#645c54",
+      "bg": "#ffffff",
+      "target": 4.5,
+      "ratio": 6.56,
+      "pass": true
+    },
+    {
+      "name": "muted on cream",
+      "fg": "#645c54",
+      "bg": "#fff8ef",
+      "target": 4.5,
+      "ratio": 6.23,
+      "pass": true
+    },
+    {
+      "name": "orange button",
+      "fg": "#ffffff",
+      "bg": "#b9470b",
+      "target": 4.5,
+      "ratio": 5.29,
+      "pass": true
+    },
+    {
+      "name": "orange link",
+      "fg": "#b9470b",
+      "bg": "#fff8ef",
+      "target": 4.5,
+      "ratio": 5.02,
+      "pass": true
+    },
+    {
+      "name": "notice",
+      "fg": "#292521",
+      "bg": "#ffead6",
+      "target": 4.5,
+      "ratio": 13.03,
+      "pass": true
+    },
+    {
+      "name": "success",
+      "fg": "#246743",
+      "bg": "#e2eee4",
+      "target": 4.5,
+      "ratio": 5.68,
+      "pass": true
+    },
+    {
+      "name": "warning",
+      "fg": "#8a5400",
+      "bg": "#fff0c7",
+      "target": 4.5,
+      "ratio": 5.54,
+      "pass": true
+    },
+    {
+      "name": "error",
+      "fg": "#a32b2b",
+      "bg": "#fff0ee",
+      "target": 4.5,
+      "ratio": 6.45,
+      "pass": true
+    },
+    {
+      "name": "footer small",
+      "fg": "#b8c8bf",
+      "bg": "#18231e",
+      "target": 4.5,
+      "ratio": 9.29,
+      "pass": true
+    },
+    {
+      "name": "WhatsApp icon",
+      "fg": "#ffffff",
+      "bg": "#146c35",
+      "target": 3,
+      "ratio": 6.51,
+      "pass": true
+    },
+    {
+      "name": "focus on white",
+      "fg": "#b9470b",
+      "bg": "#ffffff",
+      "target": 3,
+      "ratio": 5.29,
+      "pass": true
+    },
+    {
+      "name": "focus on soft",
+      "fg": "#b9470b",
+      "bg": "#ffead6",
+      "target": 3,
+      "ratio": 4.53,
+      "pass": true
+    },
+    {
+      "name": "footer focus",
+      "fg": "#ffba80",
+      "bg": "#18231e",
+      "target": 3,
+      "ratio": 9.7,
+      "pass": true
+    },
+    {
+      "name": "control border on white",
+      "fg": "#8a7768",
+      "bg": "#ffffff",
+      "target": 3,
+      "ratio": 4.27,
+      "pass": true
+    },
+    {
+      "name": "control border on cream",
+      "fg": "#8a7768",
+      "bg": "#fff8ef",
+      "target": 3,
+      "ratio": 4.05,
+      "pass": true
+    }
+  ],
+  "priorFindings": [
+    {
+      "name": "old footer small",
+      "ratio": 3.9,
+      "target": 4.5
+    },
+    {
+      "name": "old WhatsApp icon",
+      "ratio": 1.98,
+      "target": 3
+    }
+  ]
+}

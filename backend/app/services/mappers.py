@@ -2,6 +2,20 @@
 from app.schemas.product import ProductResponse
 from app.schemas.order import OrderResponse, OrderItemResponse
 from app.schemas.user import PublicUserResponse
+from app.schemas.product import ImageURL
+from pydantic import TypeAdapter, ValidationError
+
+_image_url = TypeAdapter(ImageURL)
+
+
+def safe_product_image_url(value):
+    """Legacy rows must not disclose URL credentials or break an entire listing read."""
+    if value is None:
+        return None
+    try:
+        return _image_url.validate_python(value)
+    except ValidationError:
+        return None
 
 
 def user_response(user):
@@ -13,7 +27,7 @@ def product_response(product):
     return ProductResponse(id=product.id, seller_id=product.seller_id, name=product.name,
         description=product.description, price=product.price, stock_quantity=product.stock_quantity,
         category=product.category, delivery_radius_km=product.delivery_radius_km,
-        image_url=primary, status=product.status, rejection_reason=product.rejection_reason,
+        image_url=safe_product_image_url(primary), status=product.status, rejection_reason=product.rejection_reason,
         is_active=product.is_active,updated_at=product.updated_at)
 
 

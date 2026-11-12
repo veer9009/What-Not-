@@ -2,10 +2,25 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { propertyDraft, reportReasons, PropertyDetailPage, PropertyRequestsPage, PropertyModerationPage } from './PropertyPages';
-import { propertiesApi } from '../api/properties';
+import { propertyDraft, reportReasons, PropertyDetailPage, PropertyRequestsPage, PropertyModerationPage, PropertyManagePage } from './PropertyPages';
+import { propertiesApi, type PropertyProfile } from '../api/properties';
 vi.mock('../state/AuthContext',()=>({useAuth:()=>({user:{role:'BUYER',name:'Buyer'},logout:vi.fn()})}));
 afterEach(()=>vi.restoreAllMocks());
+it('shows the saved phone-sharing preference and lets its owner withdraw it',async()=>{
+  vi.spyOn(propertiesApi,'mine').mockResolvedValue([]);
+  let saved:PropertyProfile={display_name:'Owner',capacity:'OWNER',share_contact:true};
+  vi.spyOn(propertiesApi,'profile').mockImplementation(async()=>({id:'7',user_id:'2',...saved}));
+  const save=vi.spyOn(propertiesApi,'saveProfile').mockImplementation(async value=>{saved={...saved,...value};return saved;});
+  render(<MemoryRouter><PropertyManagePage/></MemoryRouter>);
+  const sharing=await screen.findByRole('checkbox',{name:/Share account phone/});
+  await waitFor(()=>expect(sharing).toBeChecked());
+  expect(screen.getByLabelText('Public display name')).toHaveValue('Owner');
+  await userEvent.click(sharing);
+  await userEvent.click(screen.getByRole('button',{name:'Save property profile'}));
+  await waitFor(()=>expect(save).toHaveBeenCalledWith({display_name:'Owner',capacity:'OWNER',share_contact:false}));
+  await screen.findByText('Saved.');
+  expect(screen.getByRole('checkbox',{name:/Share account phone/})).not.toBeChecked();
+});
 describe('property form contracts',()=>{
   it('keeps sale inputs separate from moderation and proof upload',()=>{
     expect(propertyDraft.category).toBe('Residential');

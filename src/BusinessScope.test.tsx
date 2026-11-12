@@ -102,7 +102,7 @@ describe('What Not? business scope', () => {
   it('keeps seller creation within the existing product API categories', async () => {
     open('/seller/products/new', 'SELLER');
     await screen.findByLabelText('Product Name');
-    expect(screen.getByText(/Real Estate and Creative Services listing tools are coming soon/)).toBeInTheDocument();
+    expect(screen.getByText(/Use the property and Creative Services workspaces/)).toBeInTheDocument();
     const categories = screen.getByRole('combobox');
     expect(within(categories).getAllByRole('option').map(option => (option as HTMLOptionElement).value))
       .toEqual(['Handmade', 'Home Decor', 'Gifts', 'Fashion', 'Jewellery', 'Crafts']);

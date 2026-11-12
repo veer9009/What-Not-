@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { render as renderUI, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { BuyerCreativePage, SellerCreativePage } from './CreativePages';
 import { creativeApi } from '../api/creative';
 import { ApiError } from '../api/client';
+// Collection notices now link to a real privacy route; keep router context in component tests.
+const render = (ui: ReactNode) => renderUI(<MemoryRouter>{ui}</MemoryRouter>);
 vi.mock('../components/Shared',()=>({DashboardShell:({children}:{children:ReactNode})=><main>{children}</main>,PageTop:({title}:{title:string})=><h1>{title}</h1>}));
 vi.mock('../state/AuthContext',()=>({useAuth:()=>({user:{id:'1'}})}));
 vi.mock('../api/creative',()=>({creativeApi:{listings:vi.fn(),own:vi.fn(),rfqs:vi.fn(),engagements:vi.fn(),provider:vi.fn(),complete:vi.fn(),deliver:vi.fn(),create:vi.fn(),update:vi.fn(),enquire:vi.fn(),respond:vi.fn(),responses:vi.fn()}}));

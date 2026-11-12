@@ -102,3 +102,12 @@ def test_activation_requires_boolean():
     assert ProductActivation(is_active=False).is_active is False
     with pytest.raises(ValidationError):
         ProductActivation(is_active="false")
+
+
+@pytest.mark.parametrize('schema', [ProductCreate, ProductUpdate])
+@pytest.mark.parametrize('url', ['https://private-user:secret@example.test/image.png',
+                                  'https://private-user@example.test/image.png'])
+def test_product_image_urls_cannot_publish_credentials(schema, url):
+    data = product_data(image_url=url) if schema is ProductCreate else {'image_url': url}
+    with pytest.raises(ValidationError):
+        schema(**data)

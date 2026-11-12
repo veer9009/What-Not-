@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import Field, HttpUrl, model_validator, AwareDatetime
+from pydantic import AfterValidator, Field, HttpUrl, model_validator, AwareDatetime
 
 from .common import ContractModel, DatabaseId, MAX_INTEGER, Name, Price
 
@@ -9,6 +9,15 @@ Description = Annotated[str, Field(min_length=1, max_length=5000)]
 Stock = Annotated[int, Field(strict=True, ge=0, le=MAX_INTEGER)]
 DeliveryRadius = Literal[1, 2, 3]
 RejectionReason = Annotated[str, Field(min_length=1, max_length=2000)]
+
+
+def image_without_credentials(url):
+    if url.username or url.password:
+        raise ValueError('Image URLs cannot contain credentials')
+    return url
+
+
+ImageURL = Annotated[HttpUrl, AfterValidator(image_without_credentials)]
 
 
 class ProductStatus(str, Enum):
@@ -35,7 +44,7 @@ class ProductCreate(ContractModel):
     stock_quantity: Stock
     category: ProductCategory
     delivery_radius_km: DeliveryRadius
-    image_url: HttpUrl | None = None
+    image_url: ImageURL | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -55,7 +64,7 @@ class ProductUpdate(ContractModel):
     stock_quantity: Stock | None = None
     category: ProductCategory | None = None
     delivery_radius_km: DeliveryRadius | None = None
-    image_url: HttpUrl | None = None
+    image_url: ImageURL | None = None
 
     @model_validator(mode="before")
     @classmethod

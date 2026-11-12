@@ -29,3 +29,18 @@ def test_discovery_membership_is_identical_for_points_in_same_private_locality_c
         assert (first is None) == (second is None)
         if first is not None:
             assert first.model_dump() == second.model_dump()
+
+
+def test_legacy_image_credentials_are_omitted_without_breaking_discovery():
+    stored = product(0, 0)
+    stored.images = [SimpleNamespace(is_primary=True, image_url='https://user:private@example.test/photo')]
+    result = DiscoveryService(None)._eligible_view(stored, Coordinate(latitude=0, longitude=0))
+    assert result.image_url is None
+
+
+def test_legacy_image_credentials_are_omitted_without_breaking_owned_product_response():
+    from app.services.mappers import product_response
+    stored = product(0, 0)
+    stored.status, stored.rejection_reason, stored.is_active, stored.updated_at = 'APPROVED', None, True, None
+    stored.images = [SimpleNamespace(is_primary=True, image_url='https://user:private@example.test/photo')]
+    assert product_response(stored).image_url is None
