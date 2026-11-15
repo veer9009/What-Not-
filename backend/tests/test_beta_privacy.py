@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from decimal import Decimal
+from datetime import datetime, timezone
 
 from app.schemas.location import Coordinate
 from app.services.discovery import DiscoveryService
@@ -9,6 +10,9 @@ def product(latitude, longitude):
     return SimpleNamespace(id=1, seller_id=2, name='Vase', description='Clay', price='10.00',
         stock_quantity=2, category='Crafts', delivery_radius_km=1, images=[],
         seller=SimpleNamespace(latitude=Decimal(str(latitude)), longitude=Decimal(str(longitude)),
+                               public_discovery_latitude=Decimal(0),public_discovery_longitude=Decimal(0),
+                               public_discovery_confirmed_at=datetime.now(timezone.utc),
+                               public_discovery_consent_version='public-discovery-v1',
                                shop_name='Maker', is_verified=False))
 
 

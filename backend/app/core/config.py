@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
+from ipaddress import ip_address
+import re
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -38,6 +40,11 @@ class Settings(BaseSettings):
     address_daily_limit: int = Field(default=10, ge=1, le=100)
     checkout_daily_limit: int = Field(default=20, ge=1, le=100)
     auth_quarter_hour_limit: int = Field(default=20, ge=1, le=100)
+    trusted_hosts: list[str] = Field(default_factory=list)
+    database_pool_size: int = Field(default=5, ge=1, le=20)
+    database_max_overflow: int = Field(default=5, ge=0, le=20)
+    database_pool_timeout_seconds: int = Field(default=10, ge=1, le=60)
+    database_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
 
     @field_validator('beta_allowed_emails')
     @classmethod
@@ -103,3 +110,40 @@ class Settings(BaseSettings):
             # Accessing port validates malformed port strings too.
             parsed.port
         return origins
+
+    @field_validator('trusted_hosts')
+    @classmethod
+    def explicit_host_names(cls, hosts):
+        for host in hosts:
+            if len(host) > 253 or any(not re.fullmatch(r'[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?', label)
+                                      for label in host.split('.')):
+                raise ValueError('Trusted hosts must be explicit DNS names or IPv4 addresses without schemes, ports or wildcards')
+        return sorted({host.lower() for host in hosts})
+
+    @model_validator(mode='after')
+    def production_transport(self):
+        if self.environment != 'production':
+            return self
+        if self.database_url is None:
+            raise ValueError('DATABASE_URL is required in production')
+        if not self.trusted_hosts:
+            raise ValueError('Production requires explicit WHAT_NOT_TRUSTED_HOSTS')
+        if any(urlsplit(origin).scheme != 'https' for origin in self.cors_origins):
+            raise ValueError('Production CORS origins must use HTTPS')
+        if self.email_provider == 'smtp' and not self.smtp_starttls:
+            raise ValueError('Production SMTP requires TLS')
+        from sqlalchemy.engine import make_url
+        url = make_url(self.database_url.get_secret_value())
+        # Query overrides can silently replace the host/identity or weaken TLS.
+        # Pool/connect resource bounds are supplied by the engine factory.
+        if not url.host or not url.username or set(url.query) - {'sslmode', 'sslrootcert', 'application_name'}:
+            raise ValueError('Production database requires an explicit host/user and only approved connection parameters')
+        try:
+            local = ip_address(url.host).is_loopback
+        except ValueError:
+            local = url.host.lower() == 'localhost'
+        if not local and (url.query.get('sslmode') != 'verify-full' or
+                          not isinstance(url.query.get('sslrootcert'), str) or
+                          not url.query['sslrootcert'].strip()):
+            raise ValueError('Remote production PostgreSQL requires sslmode=verify-full and sslrootcert')
+        return self

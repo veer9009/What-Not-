@@ -123,7 +123,18 @@ try{
   await navigate(buyer,'/buyer/creative');await click(buyer,'Confirm received and complete');await fill(buyer,'textarea[name=review]','Browser completed work review');await click(buyer,'Submit review');await text(buyer,'Review saved.');
   console.log('PASS: Creative RFQ/quote/acceptance/delivery/buyer completion/review in real browser');
   // Check live coarse discovery and public copy against the production bundle.
-  await navigate(buyer,'/buyer');await click(buyer,'Use Browser home for discovery');await text(buyer,'Browser vase');
+  await navigate(buyer,'/buyer');
+  // Explicit synthetic browser permission/position, never the host's location.
+  await browser('Browser.setPermission',{permission:{name:'geolocation'},setting:'granted',origin:'http://127.0.0.1:8000'});
+  await buyer('Emulation.setGeolocationOverride',{latitude:19,longitude:72,accuracy:5});
+  await buyer('Page.bringToFront');await wait(buyer,"document.visibilityState==='visible' && window.isSecureContext");
+  await click(buyer,'Use current location');await text(buyer,'Location acquired. Confirm this draft to use it.');
+  if(!await evaluate(buyer,"document.querySelector('input[name=latitude]').value==='19' && document.querySelector('input[name=longitude]').value==='72'"))throw new Error('Browser geolocation draft was not passed accurately');
+  await text(buyer,'Location not set');await click(buyer,'Use for discovery');await text(buyer,'Browser vase');
+  console.log('PASS: native browser geolocation, explicit draft confirmation and API discovery');
+  await fill(buyer,'input[name=pincode]','411001');await text(buyer,'Location not set');
+  await click(buyer,'Use Browser home for discovery');await text(buyer,'Browser vase');
+  console.log('PASS: manual PIN lookup uses saved-address location without geocoding');
   if(await evaluate(buyer,"document.querySelector('.buyer-grid')?.innerText.includes('km away')"))throw new Error('Exact distance visible');
   console.log('PASS: production-bundle locality discovery without numeric point distance');
   await click(buyer,'View Browser vase','a');await click(buyer,'Add to Cart');await click(buyer,'View cart','a');

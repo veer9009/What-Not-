@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from app.schemas.location import Coordinate
+from app.schemas.public_discovery import PublicDiscoveryConfirmation, PUBLIC_DISCOVERY_CONSENT_VERSION
 
 from app.models import SellerProfile
 from app.repositories.sellers import SellerRepository
@@ -76,3 +77,18 @@ class SellerService:
     def list_products(self, actor_id: int, seller_id: int, *, offset=0, limit=100):
         owned_seller(self.session, actor_id, seller_id)
         return ProductRepository(self.session).for_seller(seller_id, *pagination(offset, limit))
+
+    @write_operation
+    def set_public_discovery(self, actor_id: int, data: PublicDiscoveryConfirmation | None):
+        if data is not None:
+            data = PublicDiscoveryConfirmation.model_validate(data)
+        require_user(self.session, actor_id, role='SELLER', lock=True)
+        profile = self.repository.by_user(actor_id)
+        if profile is None:
+            raise SellerNotFound('Seller profile does not exist')
+        seller = self.repository.get(profile.id, lock=True)
+        seller.public_discovery_latitude = data.latitude if data is not None else None
+        seller.public_discovery_longitude = data.longitude if data is not None else None
+        seller.public_discovery_confirmed_at = datetime.now(timezone.utc) if data is not None else None
+        seller.public_discovery_consent_version = PUBLIC_DISCOVERY_CONSENT_VERSION if data is not None else None
+        return seller

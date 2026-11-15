@@ -18,6 +18,13 @@ class SellerProfile(IdMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("latitude BETWEEN -90 AND 90", name="latitude"),
         CheckConstraint("longitude BETWEEN -180 AND 180", name="longitude"),
+        CheckConstraint("public_discovery_latitude BETWEEN -90 AND 90", name="public_discovery_latitude"),
+        CheckConstraint("public_discovery_longitude BETWEEN -180 AND 180", name="public_discovery_longitude"),
+        CheckConstraint("""(public_discovery_latitude IS NULL AND public_discovery_longitude IS NULL
+            AND public_discovery_confirmed_at IS NULL AND public_discovery_consent_version IS NULL)
+            OR (public_discovery_latitude IS NOT NULL AND public_discovery_longitude IS NOT NULL
+                AND public_discovery_confirmed_at IS NOT NULL AND public_discovery_consent_version IS NOT NULL
+                AND length(trim(public_discovery_consent_version)) > 0)""", name="public_discovery_fields"),
     )
 
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), unique=True)
@@ -27,6 +34,10 @@ class SellerProfile(IdMixin, TimestampMixin, Base):
     latitude: Mapped[Decimal] = mapped_column(Numeric(9, 6))
     longitude: Mapped[Decimal] = mapped_column(Numeric(9, 6))
     dispatch_location_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    public_discovery_latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    public_discovery_longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    public_discovery_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    public_discovery_consent_version: Mapped[str | None] = mapped_column(String(32))
     is_verified: Mapped[bool] = mapped_column(server_default=false())
     user: Mapped[User] = relationship(back_populates="seller_profile")
     products: Mapped[list[Product]] = relationship(back_populates="seller", passive_deletes="all")

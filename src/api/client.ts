@@ -1,3 +1,5 @@
+import { apiBaseUrl } from './config';
+
 let credential: string | null = null;
 let generation = 0;
 const unauthorizedListeners = new Set<() => void>();
@@ -39,7 +41,11 @@ export function identifier(id: string) {
 }
 interface Options { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; bodyText?: string; auth?: boolean; signal?: AbortSignal; idempotencyKey?: string }
 export async function api<T>(path: string, { method = 'GET', body, bodyText, auth = true, signal, idempotencyKey }: Options = {}): Promise<T> {
-  const base = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+  if (!path.startsWith('/') || path.startsWith('//') || /^\/api(?:\/|$)/.test(path)) {
+    throw new Error('Invalid API path: supply an endpoint without the API prefix.');
+  }
+  const base = apiBaseUrl(import.meta.env.PROD, import.meta.env.VITE_API_BASE_URL,
+    import.meta.env.DEV ? 'http://127.0.0.1:8000/api/v1' : '/api/v1');
   const headers = new Headers({ Accept: 'application/json' });
   if (body !== undefined || bodyText !== undefined) headers.set('Content-Type', 'application/json');
   const token = auth ? credential : null;

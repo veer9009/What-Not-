@@ -1,0 +1,27 @@
+-- Owner-approved Step 37: create ONE new empty manual QA database only.
+-- Run as an existing local administrator connected to postgres; no role changes.
+\set ON_ERROR_STOP on
+SELECT current_database()='postgres' AND inet_server_port()=5432
+ AND inet_server_addr() IN ('127.0.0.1'::inet,'::1'::inet)
+ AND (rolsuper OR rolcreatedb) AS admin_ok
+FROM pg_roles WHERE rolname=current_user \gset
+\if :admin_ok
+\else
+  \echo STOP: expected local postgres maintenance database and existing CREATE DATABASE privilege.
+  \quit 3
+\endif
+SELECT EXISTS(SELECT 1 FROM pg_database
+ WHERE datname='whatnot_tests_20261115_a7e394c2' AND oid=49265)
+ AND NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='whatnot_chrome_qa_20261115') AS target_ok \gset
+\if :target_ok
+\else
+  \echo STOP: isolated schema-source identity changed or manual QA name already exists. Nothing overwritten.
+  \quit 3
+\endif
+SELECT format('CREATE DATABASE %I OWNER %I TEMPLATE template0',
+ 'whatnot_chrome_qa_20261115',pg_get_userbyid(datdba))
+FROM pg_database WHERE datname='whatnot_tests_20261115_a7e394c2' AND oid=49265 \gexec
+SELECT datname AS new_database,oid AS new_database_oid,
+ datdba=(SELECT datdba FROM pg_database WHERE datname='whatnot_tests_20261115_a7e394c2') AS owner_matches_test
+FROM pg_database WHERE datname='whatnot_chrome_qa_20261115';
+\echo Created only the approved empty QA database. No restore, fixtures or migration executed.

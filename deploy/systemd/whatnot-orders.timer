@@ -1,0 +1,9 @@
+[Unit]
+Description=Run bounded What Not order completion
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Unit=whatnot-worker@auto-complete.service
+[Install]
+WantedBy=timers.target

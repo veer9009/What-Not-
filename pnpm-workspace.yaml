@@ -1,0 +1,4 @@
+# Targeted patches for audited transitive dependencies.
+overrides:
+  undici: 8.12.2
+  source-map-js: 1.2.2

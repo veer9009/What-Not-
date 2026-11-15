@@ -1,0 +1,42 @@
+-- Run in psql as an existing local administrator, connected to postgres.
+-- Creates only NEW databases. Does not grant CREATEDB or alter the original.
+\set ON_ERROR_STOP on
+SELECT current_database()='postgres' AND (rolsuper OR rolcreatedb) AS admin_ok
+FROM pg_roles WHERE rolname=current_user \gset
+\if :admin_ok
+\else
+  \echo STOP: connect to postgres using a role that can create databases.
+  \quit 3
+\endif
+
+SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname='whatnot_app_dev')
+  AND NOT EXISTS(SELECT 1 FROM pg_database WHERE datname IN (
+    'whatnot_rehearsal_20261115_a7e394c2','whatnot_tests_20261115_a7e394c2')) AS names_ok \gset
+\if :names_ok
+\else
+  \echo STOP: source missing or proposed target already exists. Nothing overwritten.
+  \quit 3
+\endif
+
+-- gexec executes one standalone CREATE DATABASE; no connection to the original.
+SELECT format('CREATE DATABASE %I OWNER %I TEMPLATE template0',
+  'whatnot_rehearsal_20261115_a7e394c2',pg_get_userbyid(datdba))
+FROM pg_database WHERE datname='whatnot_app_dev' \gexec
+
+-- Recheck maintenance identity and unused second target immediately before CREATE.
+SELECT current_database()='postgres' AND NOT EXISTS(
+  SELECT 1 FROM pg_database WHERE datname='whatnot_tests_20261115_a7e394c2') AS second_ok \gset
+\if :second_ok
+\else
+  \echo STOP: second target guard failed. First database retained.
+  \quit 3
+\endif
+SELECT format('CREATE DATABASE %I OWNER %I TEMPLATE template0',
+  'whatnot_tests_20261115_a7e394c2',pg_get_userbyid(datdba))
+FROM pg_database WHERE datname='whatnot_app_dev' \gexec
+
+SELECT datname AS new_database,
+  datdba=(SELECT datdba FROM pg_database WHERE datname='whatnot_app_dev') AS owner_matches_source
+FROM pg_database WHERE datname IN (
+  'whatnot_rehearsal_20261115_a7e394c2','whatnot_tests_20261115_a7e394c2');
+\echo Empty targets created. No restore or migration executed. Return to Codex for target verification.

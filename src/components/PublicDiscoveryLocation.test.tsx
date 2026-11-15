@@ -1,0 +1,35 @@
+import { render,screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach,it,expect,vi } from 'vitest';
+import { PublicDiscoveryLocation } from './PublicDiscoveryLocation';
+import { setPublicDiscovery,revokePublicDiscovery } from '../api/sellers';
+import type { Shop } from '../api/types';
+vi.mock('../api/sellers',()=>({setPublicDiscovery:vi.fn(),revokePublicDiscovery:vi.fn()}));
+const shop:Shop={id:'1',user_id:'2',shop_name:'Synthetic',description:null,phone:'qa-only',latitude:'40',longitude:'50',is_verified:false,dispatch_location_confirmed_at:null};
+afterEach(()=>vi.clearAllMocks());
+it('never copies dispatch and requires explicit renewed consent for the selected point',async()=>{
+  vi.mocked(setPublicDiscovery).mockResolvedValue(shop);
+  render(<PublicDiscoveryLocation shop={shop} reload={async()=>true}/>);
+  await userEvent.click(screen.getByRole('button',{name:'Set or change public discovery point'}));
+  expect(screen.getByLabelText('Latitude')).toHaveValue(null);
+  expect(screen.getByLabelText('Longitude')).toHaveValue(null);
+  await userEvent.type(screen.getByLabelText('Latitude'),'0');
+  await userEvent.type(screen.getByLabelText('Longitude'),'0');
+  await userEvent.click(screen.getByRole('button',{name:'Confirm public discovery point'}));
+  expect(setPublicDiscovery).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert')).toHaveTextContent(/consent/i);
+  await userEvent.click(screen.getByRole('checkbox'));
+  await userEvent.type(screen.getByLabelText('Longitude'),'1');
+  expect(screen.getByRole('checkbox')).not.toBeChecked();
+  await userEvent.clear(screen.getByLabelText('Longitude'));await userEvent.type(screen.getByLabelText('Longitude'),'0');
+  await userEvent.click(screen.getByRole('checkbox'));
+  await userEvent.click(screen.getByRole('button',{name:'Confirm public discovery point'}));
+  expect(setPublicDiscovery).toHaveBeenCalledWith({latitude:0,longitude:0});
+},20000);
+it('allows consent revocation without changing private dispatch',async()=>{
+  vi.mocked(revokePublicDiscovery).mockResolvedValue(shop);
+  render(<PublicDiscoveryLocation shop={{...shop,public_discovery_confirmed_at:'2026-11-15T00:00:00Z'}} reload={async()=>true}/>);
+  await userEvent.click(screen.getByRole('button',{name:'Revoke public discovery consent'}));
+  expect(revokePublicDiscovery).toHaveBeenCalledOnce();
+  expect(await screen.findByRole('status')).toHaveTextContent(/revoked/i);
+});

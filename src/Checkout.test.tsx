@@ -42,7 +42,7 @@ function setup(products = [first], handler?: (call: Call) => Reply | Promise<Rep
     if (path === '/auth/me') reply = [200, { id: 1, name: 'Buyer', email: 'buyer@example.test', role: 'BUYER' }];
     else if (path === '/addresses') reply = [200, savedAddresses];
     else if (path.startsWith('/discovery/')) {
-      expect(body).toEqual({ address_id: 4 });
+      expect(body).toEqual({ address_id: 4, radius_km: 3 });
       reply = handler ? await handler({ path, body, key }) : [200, products.find(p => path.endsWith('/' + p.id))];
     } else reply = handler ? await handler({ path, body, key }) : [201, { id: 10, total: '250.00' }];
     return new Response(JSON.stringify(reply[1]), { status: reply[0] });

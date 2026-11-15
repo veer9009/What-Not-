@@ -7,8 +7,21 @@ from app.services.inputs import SellerCreate, SellerUpdate
 from app.services.sellers import SellerService
 from app.services.mappers import product_response
 from app.schemas.location import Coordinate
+from app.schemas.common import ContractModel
+from app.schemas.public_discovery import PublicDiscoveryConfirmation
 
 router = APIRouter(prefix='/sellers', tags=['Sellers'])
+
+
+@router.patch('/me/public-discovery-location', response_model=SellerResponse,
+              description='Confirm an explicitly consented public discovery point owned by the authenticated seller.')
+def confirm_public_discovery(payload: PublicDiscoveryConfirmation, user: Seller, session: TransactionSession):
+    return seller_response(SellerService(session).set_public_discovery(user.id, payload))
+
+
+@router.post('/me/public-discovery-location/revoke', response_model=SellerResponse)
+def revoke_public_discovery(payload: ContractModel, user: Seller, session: TransactionSession):
+    return seller_response(SellerService(session).set_public_discovery(user.id, None))
 
 
 @router.patch('/me/dispatch-location', response_model=SellerResponse,

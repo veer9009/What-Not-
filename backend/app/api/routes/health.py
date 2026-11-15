@@ -5,6 +5,7 @@ from app.api.dependencies import TransactionSession
 from fastapi import HTTPException
 from sqlalchemy import text, select, func
 from app.models.events import EmailOutbox
+from app.db.schema import EXPECTED_REVISION
 
 router = APIRouter(tags=["Health"])
 
@@ -19,7 +20,7 @@ async def health() -> HealthResponse:
 def readiness(session: TransactionSession):
     """Storage/schema readiness and aggregate backlog, without recipient data."""
     revision = session.scalar(text('SELECT version_num FROM alembic_version'))
-    if revision != '0008':
+    if revision != EXPECTED_REVISION:
         raise HTTPException(503, 'Database schema is not ready')
     pending = session.scalar(select(func.count()).select_from(EmailOutbox).where(
         EmailOutbox.state.in_(['PENDING','LEASED'])))

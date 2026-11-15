@@ -1,3 +1,29 @@
+/* Scoped buyer discovery controls retain the marketplace palette and focus styles. */
+.discovery-location{margin-bottom:2rem;overflow-wrap:anywhere}
+.discovery-location>h2{font-size:clamp(1.6rem,3vw,2.2rem);margin-bottom:1rem}
+.discovery-location p{line-height:1.65}
+.discovery-location .location-picker{display:grid;gap:1rem;max-width:36rem;margin:1.5rem 0}
+.discovery-location .location-picker>p{margin:0}
+.discovery-location .location-picker .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.discovery-location .location-picker label,.discovery-saved-address>label{display:grid;gap:.5rem;min-width:0;font-size:.875rem;font-weight:700}
+.discovery-location input{box-sizing:border-box;display:block;width:100%;min-width:0;min-height:48px;padding:.85rem 1rem;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface);font:inherit}
+.discovery-location .btn{width:min(100%,22rem);min-height:48px;white-space:normal;text-align:center;line-height:1.4}
+.discovery-location .api-error,.discovery-location .success-note{margin:0}
+.discovery-location-status{color:var(--color-success);font-weight:700;margin-bottom:1rem}
+.discovery-saved-address{border-top:1px solid var(--color-border);padding-top:1.5rem;margin-top:1.5rem;max-width:36rem}
+.discovery-saved-address>h3{margin:0 0 1rem}
+.discovery-saved-address>label{width:100%;max-width:28rem}
+.discovery-saved-address>p{font-size:.875rem;color:var(--color-text-muted);margin:.65rem 0 1rem}
+.discovery-address-actions{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:.75rem}
+.discovery-clear-action{margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--color-border)}
+.discovery-radius{max-width:36rem;margin-top:1.5rem}.discovery-radius .radius-select{display:flex;flex-wrap:wrap;gap:.5rem}.discovery-radius .radius-select button{min-height:44px;min-width:64px}.discovery-radius>p{font-size:.875rem;color:var(--color-text-muted);margin:.75rem 0}
+.public-point-consent{display:flex;align-items:flex-start;gap:.75rem;margin:1rem 0;line-height:1.6}.public-point-consent input{width:22px;height:22px;flex-shrink:0}.panel[aria-label="Public discovery location"]>.btn{margin:.75rem .75rem .75rem 0}
+#homemade-catalogue .product-grid{align-items:stretch;margin:1.25rem 0}
+#homemade-catalogue .product-card{display:flex;flex-direction:column;min-width:0;overflow-wrap:anywhere}
+#homemade-catalogue .product-body{display:flex;flex-direction:column;flex:1;gap:.5rem}
+#homemade-catalogue .product-body>p,#homemade-catalogue .product-body>h3{margin:0}
+#homemade-catalogue .price-row{margin-top:auto;gap:.75rem;flex-wrap:wrap}
+@media(max-width:520px){.discovery-location .location-picker .form-grid{grid-template-columns:minmax(0,1fr)}.discovery-location .btn{width:100%}.discovery-address-actions{display:grid;grid-template-columns:minmax(0,1fr)}}
 /* Order progress and support share the marketplace's Warm Orange tokens. */
 .order-details{margin-top:1.25rem;overflow-wrap:anywhere}
 .order-tracking{margin:1.5rem 0}

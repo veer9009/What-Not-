@@ -1,0 +1,9 @@
+[Unit]
+Description=Run bounded What Not email processing
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Unit=whatnot-worker@process-email.service
+[Install]
+WantedBy=timers.target

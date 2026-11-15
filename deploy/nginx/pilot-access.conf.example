@@ -1,0 +1,6 @@
+# Copy outside the release; insert only reviewed participant/VPN CIDRs before deny.
+# No participant network has been supplied. Default is deliberately closed.
+# Loopback permits local health probes; it does not grant external pilot access.
+allow 127.0.0.1;
+allow ::1;
+deny all;

@@ -27,7 +27,9 @@ def test_production_requires_beta_admission_and_abuse_controls():
     with pytest.raises(ValidationError):
         Settings(_env_file=None, environment='production', jwt_secret_key='x' * 48)
     settings = Settings(_env_file=None, environment='production', jwt_secret_key='x' * 48,
-                        beta_allowed_emails=['Tester@Example.com'])
+                        beta_allowed_emails=['Tester@Example.com'],
+                        database_url='postgresql+psycopg://synthetic@127.0.0.1/unit_only',
+                        cors_origins=['https://pilot.example.test'], trusted_hosts=['pilot.example.test'])
     assert settings.beta_allowed_emails == ['tester@example.com']
     assert settings.abuse_limits_enabled
 

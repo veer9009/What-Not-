@@ -22,6 +22,11 @@ def geographic_order(db, records):
     records['seller'].latitude = Decimal('0')
     records['seller'].longitude = Decimal('0')
     records['seller'].dispatch_location_confirmed_at = datetime.now(timezone.utc)
+    # Explicit synthetic consent, independently of the private dispatch point.
+    records['seller'].public_discovery_latitude = Decimal('0')
+    records['seller'].public_discovery_longitude = Decimal('0')
+    records['seller'].public_discovery_confirmed_at = datetime.now(timezone.utc)
+    records['seller'].public_discovery_consent_version = 'public-discovery-v1'
     records['address'].latitude = Decimal('0')
     records['address'].longitude = Decimal('0.001')
     records['product'].status = 'APPROVED'
@@ -49,7 +54,7 @@ def test_saved_address_radius_matches_discovery(auth_client, db, records, geogra
     headers = bearer(records['buyer'].id)
     detail = auth_client.post(f"/api/v1/discovery/products/{records['product'].id}",
                              headers=headers, json={'address_id': records['address'].id})
-    assert detail.status_code == 200  # Coarse candidates include points outside the exact checkout radius.
+    assert detail.status_code == (200 if inside else 404)
     response = auth_client.post('/api/v1/orders', headers=headers, json=geographic_order)
     assert response.status_code == (201 if inside else 409), response.text
     if inside:
@@ -79,7 +84,8 @@ def test_placement_matches_discovery_at_exact_tolerance(db, records, geographic_
         OrderService(db).create(OrderPlacement(buyer_id=records['buyer'].id, **geographic_order))
         assert records['product'].stock_quantity == 3
     else:
-        discovery.DiscoveryService(db).get(records['buyer'].id, records['product'].id, source)
+        with pytest.raises(errors.ProductNotFound):
+            discovery.DiscoveryService(db).get(records['buyer'].id, records['product'].id, source)
         with pytest.raises(errors.ServiceError, match='outside the selected delivery address'):
             OrderService(db).create(OrderPlacement(buyer_id=records['buyer'].id, **geographic_order))
         unchanged(db, records)

@@ -1,0 +1,86 @@
+# Include within nginx's http context (sites-enabled on the proposed Ubuntu host).
+# Render reviewed domain, certificate/key, frontend and access-file inputs first.
+# Omits query strings, bodies, tokens, IPs and arbitrary request paths in access logs.
+log_format whatnot_minimal '$request_id $request_method $status $body_bytes_sent '
+                           '$request_time $upstream_response_time';
+access_log /var/log/nginx/whatnot-access.log whatnot_minimal;
+limit_req_zone $binary_remote_addr zone=whatnot_pilot:1m rate=5r/s;
+
+server {
+    listen 80 default_server;
+    server_name _;
+    return 444;
+}
+server {
+    listen 80;
+    server_name @@PILOT_DOMAIN@@;
+    include @@PILOT_ACCESS_FILE@@;
+    location / { return 308 https://@@PILOT_DOMAIN@@$request_uri; }
+}
+server {
+    listen 443 ssl default_server;
+    server_name @@PILOT_DOMAIN@@;
+    if ($host != @@PILOT_DOMAIN@@) { return 444; }
+    ssl_certificate @@TLS_CERTIFICATE@@;
+    ssl_certificate_key @@TLS_PRIVATE_KEY@@;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:WhatNotTLS:1m;
+    ssl_session_timeout 1d;
+    server_tokens off;
+    root @@FRONTEND_ROOT@@;
+    index index.html;
+
+    # Whole-site restriction, including public API reads and static content.
+    include @@PILOT_ACCESS_FILE@@;
+    client_max_body_size 256k;
+    client_body_timeout 10s;
+    client_header_timeout 10s;
+    keepalive_timeout 15s;
+    send_timeout 30s;
+    access_log /var/log/nginx/whatnot-access.log whatnot_minimal;
+    error_log /var/log/nginx/whatnot-error.log warn;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy no-referrer always;
+    add_header X-Frame-Options DENY always;
+    add_header Permissions-Policy "geolocation=(self), camera=(), microphone=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
+
+    # Overwrite client-supplied forwarding headers. Only this loopback peer is
+    # trusted by Uvicorn; never use forwarded-allow-ips='*'.
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Request-ID $request_id;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 30s;
+    proxy_send_timeout 30s;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+
+    location = /api { return 404; }
+    location = /api/v1/ready {
+        # Local monitoring only. Overrides the broader participant access list.
+        allow 127.0.0.1;
+        allow ::1;
+        deny all;
+        proxy_pass http://127.0.0.1:8000;
+    }
+    location /api/ {
+        limit_req zone=whatnot_pilot burst=30 nodelay;
+        limit_req_status 429;
+        # No trailing slash: retain /api/v1/... at the backend.
+        proxy_pass http://127.0.0.1:8000;
+    }
+    location /assets/ {
+        try_files $uri =404;
+        expires 1y;
+    }
+    location ~ /\. { deny all; }
+    location / {
+        expires -1;
+        try_files $uri $uri/ /index.html;
+    }
+}

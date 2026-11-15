@@ -7,6 +7,7 @@ from app.services.errors import ProductNotFound
 from app.services.geography import distance_km, within_radius
 from app.services.users import require_user
 from app.services.mappers import safe_product_image_url
+from app.schemas.public_discovery import PUBLIC_DISCOVERY_CONSENT_VERSION
 import math
 
 
@@ -29,8 +30,20 @@ class DiscoveryService:
             return Coordinate(latitude=address.latitude, longitude=address.longitude)
         return source.location
 
-    def _eligible_view(self, product, location):
+    def _eligible_view(self, product, location, radius_km=3):
         seller = product.seller
+        if (seller.public_discovery_latitude is None or seller.public_discovery_longitude is None
+                or seller.public_discovery_confirmed_at is None
+                or seller.public_discovery_consent_version != PUBLIC_DISCOVERY_CONSENT_VERSION):
+            return None
+        try:
+            public_distance = distance_km(location.latitude, location.longitude,
+                seller.public_discovery_latitude, seller.public_discovery_longitude)
+        except ValueError:
+            # Invalid legacy public points are excluded, never fabricated.
+            return None
+        if not within_radius(public_distance, radius_km) or not within_radius(public_distance, product.delivery_radius_km):
+            return None
         latitude, longitude = locality_center(seller.latitude, seller.longitude)
         distance = distance_km(location.latitude, location.longitude, latitude, longitude)
         # 0.8 km bounds the displacement to the cell centre at the equator.
@@ -52,7 +65,7 @@ class DiscoveryService:
             if not batch:
                 return results
             for product in batch:
-                view = self._eligible_view(product, location)
+                view = self._eligible_view(product, location, query.radius_km)
                 if view is not None:
                     if eligible_count >= query.offset:
                         results.append(view)
@@ -65,7 +78,7 @@ class DiscoveryService:
         source = DiscoverySource.model_validate(source)
         location = self._location(actor_id, source)
         product = self.repository.eligible_detail(product_id)
-        view = self._eligible_view(product, location) if product is not None else None
+        view = self._eligible_view(product, location, source.radius_km) if product is not None else None
         if view is None:
             raise ProductNotFound('Product is unavailable')
         return view

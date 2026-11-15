@@ -1,0 +1,54 @@
+-- Approved NEW isolated databases only; never alters source or existing targets.
+\set ON_ERROR_STOP on
+SELECT current_database()='postgres' AND host(inet_server_addr())='127.0.0.1'
+ AND inet_server_port()=5432 AND NOT pg_is_in_recovery()
+ AND current_setting('server_version_num')::int BETWEEN 170000 AND 179999
+ AND EXISTS(SELECT 1 FROM pg_roles WHERE rolname=current_user AND (rolsuper OR rolcreatedb))
+ AND EXISTS(SELECT 1 FROM pg_database WHERE datname='whatnot_app_dev' AND oid=41069
+            AND datlocprovider='c') AS guard_ok \gset
+\if :guard_ok
+\else
+  \echo STOP: wrong server/source identity, locale provider or administrator privilege.
+  \quit 3
+\endif
+
+SELECT NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='whatnot_0009_rehearsal_20261115_f24a8f87')
+ AND EXISTS(SELECT 1 FROM pg_database WHERE datname='whatnot_app_dev' AND oid=41069)
+ AS unused_ok \gset
+\if :unused_ok
+\else
+  \echo STOP: target already exists or source identity changed; nothing overwritten.
+  \quit 3
+\endif
+SELECT format('CREATE DATABASE %I WITH OWNER %I TEMPLATE template0 ENCODING %L LOCALE_PROVIDER libc LC_COLLATE %L LC_CTYPE %L',
+ 'whatnot_0009_rehearsal_20261115_f24a8f87',pg_get_userbyid(datdba),pg_encoding_to_char(encoding),datcollate,datctype)
+ FROM pg_database WHERE datname='whatnot_app_dev' AND oid=41069 \gexec
+DO $guard$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_database d JOIN pg_database s ON s.datname='whatnot_app_dev'
+   WHERE d.datname='whatnot_0009_rehearsal_20261115_f24a8f87' AND d.datdba=s.datdba AND s.oid=41069)
+ THEN RAISE EXCEPTION 'New database owner verification failed'; END IF;
+END $guard$;
+REVOKE ALL ON DATABASE whatnot_0009_rehearsal_20261115_f24a8f87 FROM PUBLIC;
+
+SELECT NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='whatnot_0009_rollback_20261115_f24a8f87')
+ AND EXISTS(SELECT 1 FROM pg_database WHERE datname='whatnot_app_dev' AND oid=41069)
+ AS unused_ok \gset
+\if :unused_ok
+\else
+  \echo STOP: target already exists or source identity changed; nothing overwritten.
+  \quit 3
+\endif
+SELECT format('CREATE DATABASE %I WITH OWNER %I TEMPLATE template0 ENCODING %L LOCALE_PROVIDER libc LC_COLLATE %L LC_CTYPE %L',
+ 'whatnot_0009_rollback_20261115_f24a8f87',pg_get_userbyid(datdba),pg_encoding_to_char(encoding),datcollate,datctype)
+ FROM pg_database WHERE datname='whatnot_app_dev' AND oid=41069 \gexec
+DO $guard$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_database d JOIN pg_database s ON s.datname='whatnot_app_dev'
+   WHERE d.datname='whatnot_0009_rollback_20261115_f24a8f87' AND d.datdba=s.datdba AND s.oid=41069)
+ THEN RAISE EXCEPTION 'New database owner verification failed'; END IF;
+END $guard$;
+REVOKE ALL ON DATABASE whatnot_0009_rollback_20261115_f24a8f87 FROM PUBLIC;
+
+SELECT d.datname,d.oid,d.datdba=s.datdba AS owner_matches_source
+ FROM pg_database d JOIN pg_database s ON s.datname='whatnot_app_dev' AND s.oid=41069
+ WHERE d.datname IN ('whatnot_0009_rehearsal_20261115_f24a8f87','whatnot_0009_rollback_20261115_f24a8f87') ORDER BY d.datname;
+\echo New isolated targets retained; no restore or migration has run.

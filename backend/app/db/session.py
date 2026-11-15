@@ -11,7 +11,12 @@ def build_engine(settings: Settings) -> Engine:
     """Explicit factory; does not create tables or connect until first use."""
     if settings.database_url is None:
         raise ValueError("DATABASE_URL is required for database operations")
-    return create_engine(settings.database_url.get_secret_value(), pool_pre_ping=True, echo=False)
+    return create_engine(settings.database_url.get_secret_value(), pool_pre_ping=True, echo=False,
+                         hide_parameters=True, pool_size=settings.database_pool_size,
+                         max_overflow=settings.database_max_overflow,
+                         pool_timeout=settings.database_pool_timeout_seconds,
+                         pool_recycle=1800,
+                         connect_args={'connect_timeout': settings.database_connect_timeout_seconds})
 
 
 @contextmanager

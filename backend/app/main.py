@@ -3,6 +3,7 @@ from threading import Lock
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes import admin, auth, health, orders, products, addresses, sellers, discovery
 from app.api.routes import notifications, properties, creative
@@ -26,6 +27,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         title="What Not? API", version="0.1.0",
         description="Controlled-beta marketplace: Homemade orders, sale properties and Creative Services. Locality discovery; exact delivery eligibility at checkout. No payments are collected.",
         lifespan=lifespan,
+        docs_url=None if settings.environment == 'production' else '/docs',
+        redoc_url=None if settings.environment == 'production' else '/redoc',
+        openapi_url=None if settings.environment == 'production' else '/openapi.json',
     )
     application.state.settings = settings
     application.state.database_engine = None
@@ -36,6 +40,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def private_api_cache_policy(request, call_next):
         response = await call_next(request)
         response.headers['Cache-Control'] = 'no-store'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Referrer-Policy'] = 'no-referrer'
+        response.headers['X-Frame-Options'] = 'DENY'
         return response
 
     application.add_middleware(
@@ -43,6 +50,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "Idempotency-Key"],
     )
+    if settings.trusted_hosts:
+        application.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts,
+                                   www_redirect=False)
     for router in (health.router, auth.router, products.router, orders.router, admin.router, addresses.router, sellers.router, discovery.router, notifications.router, properties.router, creative.router):
         application.include_router(router, prefix="/api/v1")
     return application

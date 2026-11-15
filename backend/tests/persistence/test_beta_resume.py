@@ -54,7 +54,7 @@ def test_property_expiry_is_bounded_notifies_once_and_preserves_confirmed_visits
 def test_readiness_checks_schema_and_reports_backlog_without_pii(auth_client):
     response = auth_client.get('/api/v1/ready')
     assert response.status_code == 200
-    assert response.json()['schema'] == '0008'
+    assert response.json()['schema'] == '0009'
     assert isinstance(response.json()['outbox_pending'], int)
     assert not any(word in response.text for word in ['password', 'email@', 'postgresql://'])
 
@@ -90,6 +90,11 @@ def test_http_discovery_probes_cannot_distinguish_private_points_in_one_cell(aut
     from test_authorization import bearer
     records['product'].status='APPROVED'
     records['seller'].dispatch_location_confirmed_at=datetime.now(timezone.utc)
+    # Explicit synthetic public point remains fixed as private dispatch varies.
+    records['seller'].public_discovery_latitude=0
+    records['seller'].public_discovery_longitude=0
+    records['seller'].public_discovery_confirmed_at=datetime.now(timezone.utc)
+    records['seller'].public_discovery_consent_version='public-discovery-v1'
     headers=bearer(records['buyer'].id)
     for origin in [-.025,-.015,-.005,0,.005,.015,.025,.035]:
         observations=[]

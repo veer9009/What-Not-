@@ -13,6 +13,10 @@ SOURCE = {'location': {'latitude': 19.076, 'longitude': 72.8777}}
 @pytest.fixture
 def available(records, db):
     records['seller'].dispatch_location_confirmed_at = datetime.now(timezone.utc)
+    records['seller'].public_discovery_latitude = records['seller'].latitude
+    records['seller'].public_discovery_longitude = records['seller'].longitude
+    records['seller'].public_discovery_confirmed_at = datetime.now(timezone.utc)
+    records['seller'].public_discovery_consent_version = 'public-discovery-v1'
     records['product'].status = 'APPROVED'
     db.flush()
     return records
@@ -59,6 +63,8 @@ def test_each_radius_and_unrounded_outside_point(auth_client, available, db, rad
     p.delivery_radius_km = radius
     available['seller'].latitude = 0
     available['seller'].longitude = 0
+    available['seller'].public_discovery_latitude = 0
+    available['seller'].public_discovery_longitude = 0
     db.flush()
     headers = bearer(available['buyer'].id)
     # One degree along the equator is ~111.195 km. Literal coordinates straddle each boundary.
@@ -66,7 +72,7 @@ def test_each_radius_and_unrounded_outside_point(auth_client, available, db, rad
     def query(longitude):
         return auth_client.post(PATH, json={'location': {'latitude': 0, 'longitude': longitude}}, headers=headers)
     assert len(query(inside).json()) == 1
-    assert len(query(outside).json()) == 1  # Exact delivery boundary is private to checkout.
+    assert query(outside).json() == []  # Public-point product radius is exact; private checkout remains separate.
     assert query(.1).json() == []
 
 
@@ -83,6 +89,8 @@ def test_pagination_after_more_than_100_ineligible_candidates(auth_client, avail
     p.delivery_radius_km = 1
     available['seller'].latitude = 0
     available['seller'].longitude = 0
+    available['seller'].public_discovery_latitude = 0
+    available['seller'].public_discovery_longitude = 0
     for n in range(104):
         db.add(Product(seller_id=p.seller_id, name=f'Far {n}', description='Far', price=1,
             stock_quantity=1, category='Crafts', delivery_radius_km=1, status='APPROVED'))
@@ -93,7 +101,7 @@ def test_pagination_after_more_than_100_ineligible_candidates(auth_client, avail
         db.add(product)
         eligible.append(product)
     db.flush()
-    source = {'location': {'latitude': 0, 'longitude': .03}, 'offset': 1, 'limit': 1}
+    source = {'location': {'latitude': 0, 'longitude': .02}, 'offset': 1, 'limit': 1}
     result = auth_client.post(PATH, json=source, headers=bearer(available['buyer'].id))
     assert result.status_code == 200
     assert [p['id'] for p in result.json()] == [eligible[1].id]
@@ -131,3 +139,42 @@ def test_invalid_requests_do_not_echo_coordinates(auth_client, available):
         assert response.status_code == 422
         assert '91.123456' not in response.text
     assert auth_client.post(f'{PATH}/9223372036854775807', json=SOURCE, headers=headers).status_code == 404
+
+
+def test_device_location_changes_results_without_changing_saved_or_dispatch_points(auth_client, available, db):
+    r = available
+    headers = bearer(r['buyer'].id)
+    db.refresh(r['seller'])  # Compare database Decimals, not fixture string inputs.
+    original_dispatch = (r['seller'].latitude, r['seller'].longitude)
+    # Saved delivery and device discovery are intentionally independent sources.
+    r['address'].latitude = 0
+    r['address'].longitude = 0
+    db.flush()
+    assert len(auth_client.post(PATH, json=SOURCE, headers=headers).json()) == 1
+    assert auth_client.post(PATH, json={'address_id': r['address'].id}, headers=headers).json() == []
+    moved = {'location': {'latitude': 0, 'longitude': 0}}
+    assert auth_client.post(PATH, json=moved, headers=headers).json() == []
+    db.expire_all()
+    assert (r['seller'].latitude, r['seller'].longitude) == original_dispatch
+    assert (r['address'].latitude, r['address'].longitude) == (0, 0)
+
+
+@pytest.mark.parametrize('source', [
+    {'pincode': '400001'}, {'location': {'pincode': '400001'}},
+    {'location': {'latitude': None, 'longitude': 0}},
+])
+def test_pin_only_and_missing_coordinates_never_become_a_fabricated_point(auth_client, available, source):
+    response = auth_client.post(PATH, json=source, headers=bearer(available['buyer'].id))
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize('table', ['seller_profiles', 'addresses'])
+@pytest.mark.parametrize('column', ['latitude', 'longitude'])
+def test_locationless_records_cannot_enter_the_marketplace(db, available, table, column):
+    from sqlalchemy import text
+    from sqlalchemy.exc import IntegrityError
+
+    # Fixed test identifiers only; an absent coordinate is not treated as zero.
+    with pytest.raises(IntegrityError):
+        with db.begin_nested():
+            db.execute(text(f'UPDATE {table} SET {column}=NULL'))

@@ -9,6 +9,7 @@ from app.schemas.product import ProductCreate
 
 
 class DiscoverySource(ContractModel):
+    radius_km: Annotated[int, Field(strict=True, ge=1, le=3)] = 3
     address_id: DatabaseId | None = None
     location: Coordinate | None = None
 

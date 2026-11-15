@@ -36,6 +36,14 @@ def run_migrations_offline():
 
 
 def run_migrations_online():
+    # A controlled maintenance window may forbid new database connections.
+    # Reuse the caller's verified connection without closing or replacing it.
+    existing = config.attributes.get('connection')
+    if existing is not None:
+        context.configure(connection=existing, target_metadata=target_metadata, compare_type=True)
+        with context.begin_transaction():
+            context.run_migrations()
+        return
     engine = create_engine(database_url(), poolclass=pool.NullPool, echo=False)
     try:
         with engine.connect() as connection:
