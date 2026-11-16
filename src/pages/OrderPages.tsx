@@ -9,6 +9,7 @@ import type { Fulfillment, OrderStatus } from '../api/types';
 import { useResource } from '../state/useResource';
 import { useAuth } from '../state/AuthContext';
 import { supportUrl } from '../utils/support';
+import { deliveryDirections } from '../location/directions';
 
 // Suggestions for UX only. Every attempted transition is authorized by the service.
 const sellerActions: Partial<Record<OrderStatus, [OrderStatus, string][]>> = {
@@ -61,6 +62,14 @@ function OrderDetails({ id }: { id: string | undefined }) {
     finally{pending.current=false;setBusy(false);}
   }
 
+  async function confirmLocation(){
+    if(pending.current||!id||!fulfillment?.delivery_location)return;
+    pending.current=true;setBusy(true);setError('');
+    try{setFulfillment(await ordersApi.confirmDeliveryLocation(id,fulfillment.delivery_location));}
+    catch(reason){setError(errorMessage(reason));}
+    finally{pending.current=false;setBusy(false);}
+  }
+
   async function transition(status: OrderStatus) {
     if (pending.current || !id) return;
     pending.current = true;
@@ -99,7 +108,25 @@ function OrderDetails({ id }: { id: string | undefined }) {
           <p className="approval-help">Reporting a problem pauses automatic completion and records a dispute for investigation.</p>
         </section>}
         {order.status==='DELIVERED'&&order.confirmation_deadline&&<p>Confirmation deadline: {new Date(order.confirmation_deadline).toLocaleString()}. Without a dispute, this order is eligible for automatic completion after that time.</p>}
-        {role==='seller'&&['ACCEPTED','PREPARING','OUT_FOR_DELIVERY','DELIVERED','DELIVERY_DISPUTED'].includes(order.status)&&<section aria-label="Delivery details"><button className="btn btn-outline" disabled={busy} onClick={()=>void loadFulfillment()}>View delivery details</button>{fulfillment&&<address>{fulfillment.recipient_name}<br/>{fulfillment.phone}<br/>{fulfillment.address_line1}{fulfillment.address_line2&&<><br/>{fulfillment.address_line2}</>}<br/>{fulfillment.city}, {fulfillment.state} {fulfillment.pincode}</address>}</section>}
+        {((role==='seller'&&['ACCEPTED','PREPARING','OUT_FOR_DELIVERY','DELIVERED','DELIVERY_DISPUTED'].includes(order.status))||
+          (role==='buyer'&&['PLACED','ACCEPTED','PREPARING','OUT_FOR_DELIVERY'].includes(order.status)))&&
+          <section aria-label="Delivery details">
+            <button className="btn btn-outline" disabled={busy} onClick={()=>void loadFulfillment()}>{role==='seller'?'View delivery details':'Review delivery location'}</button>
+            {fulfillment&&<>
+              <address>{fulfillment.recipient_name}<br/>{fulfillment.phone}<br/>{fulfillment.address_line1}{fulfillment.address_line2&&<><br/>{fulfillment.address_line2}</>}<br/>{fulfillment.city}, {fulfillment.state} {fulfillment.pincode}</address>
+              {role==='seller'?(fulfillment.delivery_location_confirmed&&deliveryDirections(fulfillment.delivery_location)?
+                <><a className="btn btn-primary" href={deliveryDirections(fulfillment.delivery_location)!} target="_blank" rel="noopener noreferrer">Navigate to Buyer</a><p className="approval-help">Opens Google Maps with the buyer-confirmed destination.</p></>:
+                <p>Buyer-confirmed delivery coordinates are unavailable. Use the postal address and arrange delivery with the buyer.</p>):
+                <><p>Review the actual delivery point below. Confirming shares this saved point with the assigned seller during eligible fulfillment states for Google Maps navigation. No device location is collected.</p>
+                  {deliveryDirections(fulfillment.delivery_location)?<>
+                    <p>Latitude: {fulfillment.delivery_location!.latitude}, longitude: {fulfillment.delivery_location!.longitude}</p>
+                    {fulfillment.delivery_location_confirmed?<p role="status">Delivery location confirmed for this order.</p>:
+                      <button className="btn btn-primary" disabled={busy} onClick={()=>void confirmLocation()}>Confirm delivery location for seller navigation</button>}
+                    <p>If this point is incorrect, contact the seller before delivery. Historical delivery fields cannot be edited; use a replacement address for future orders.</p>
+                  </>:<p>No valid coordinates are available. Arrange delivery using the postal address.</p>}
+                </>}
+            </>}
+          </section>}
         {order.items.map(item => <article key={item.product_id}><h3>{item.name}</h3><p>{item.quantity} × ₹{item.unit_price}</p></article>)}
         <p>Subtotal: ₹{order.subtotal}</p><p>Delivery fee: ₹{order.delivery_fee}</p><p><b>Total: ₹{order.total}</b></p>
         <div className="form-actions">{actions.map(([status, label]) => <button className="btn btn-primary" disabled={busy} key={status} onClick={() => void transition(status)}>{label}</button>)}</div>

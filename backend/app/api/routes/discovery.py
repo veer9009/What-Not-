@@ -14,7 +14,7 @@ router = APIRouter(prefix='/discovery', tags=['Discovery'])
 def list_products(payload: DiscoveryQuery, user: Buyer, session: TransactionSession, response: Response, request: Request):
     check_action_limit(session,request.app.state.settings,'discovery',user.id)
     response.headers['Cache-Control'] = 'no-store'
-    return DiscoveryService(session).list(user.id, payload)
+    return DiscoveryService(session, request.app.state.settings).list(user.id, payload)
 
 
 @router.post('/products/{product_id}', response_model=BuyerProduct,
@@ -23,4 +23,4 @@ def get_product(product_id: IdentifierPath, payload: DiscoverySource, user: Buye
                 session: TransactionSession, response: Response, request: Request):
     check_action_limit(session,request.app.state.settings,'discovery',user.id)
     response.headers['Cache-Control'] = 'no-store'
-    return DiscoveryService(session).get(user.id, product_id, payload)
+    return DiscoveryService(session, request.app.state.settings).get(user.id, product_id, payload)

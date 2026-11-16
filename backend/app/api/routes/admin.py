@@ -18,18 +18,18 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 @router.get("/products/pending", response_model=list[ProductResponse], description='Active database ADMIN only: list pending products.')
-def pending_products(user: Admin, session: TransactionSession, offset:int=Query(0,ge=0), limit:int=Query(50,ge=1,le=100)):
-    return [product_response(product) for product in ModerationService(session).list_pending(user.id,offset=offset,limit=limit)]
+def pending_products(user: Admin, session: TransactionSession, request: Request, offset:int=Query(0,ge=0), limit:int=Query(50,ge=1,le=100)):
+    return [product_response(product, request.app.state.settings) for product in ModerationService(session).list_pending(user.id,offset=offset,limit=limit)]
 
 
 @router.post("/products/{product_id}/approve", response_model=ProductResponse, description='Active database ADMIN only: approve a pending product.')
-def approve_product(product_id: IdentifierPath, payload:ProductApproval, user: Admin, session: TransactionSession):
-    return product_response(ModerationService(session).approve(user.id, product_id,payload.expected_updated_at))
+def approve_product(product_id: IdentifierPath, payload:ProductApproval, user: Admin, session: TransactionSession, request: Request):
+    return product_response(ModerationService(session).approve(user.id, product_id,payload.expected_updated_at), request.app.state.settings)
 
 
 @router.post("/products/{product_id}/reject", response_model=ProductResponse, description='Active database ADMIN only: reject a pending product with a reason.')
-def reject_product(product_id: IdentifierPath, payload: ProductRejection, user: Admin, session: TransactionSession):
-    return product_response(ModerationService(session).reject(user.id, product_id, payload.rejection_reason))
+def reject_product(product_id: IdentifierPath, payload: ProductRejection, user: Admin, session: TransactionSession, request: Request):
+    return product_response(ModerationService(session).reject(user.id, product_id, payload.rejection_reason), request.app.state.settings)
 
 
 def account(user):
@@ -71,8 +71,8 @@ def investigate_delivery(order_id:IdentifierPath,data:Investigation,user:Admin,s
 
 
 @router.post('/products/{product_id}/takedown',response_model=ProductResponse)
-def takedown(product_id:IdentifierPath,data:Investigation,user:Admin,session:TransactionSession):
-    return product_response(AdminService(session).takedown_product(user.id,product_id,data.reason))
+def takedown(product_id:IdentifierPath,data:Investigation,user:Admin,session:TransactionSession,request:Request):
+    return product_response(AdminService(session).takedown_product(user.id,product_id,data.reason), request.app.state.settings)
 
 
 @router.get('/audit')

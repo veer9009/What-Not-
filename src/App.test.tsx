@@ -8,10 +8,13 @@ import { getAccessToken, setAccessToken } from './api/client';
 export const account = (role='BUYER') => ({ id: 1, name: 'Ravi', email: 'ravi@example.test', role });
 export function mockApi(handler: (path: string, method: string, body: any) => [number, unknown]) {
   const fetcher=vi.fn(async (input: string, options: RequestInit) => {
-    const path=new URL(input).pathname.replace('/api/v1','');
+    const path=new URL(input, location.origin).pathname.replace('/api/v1','');
     const [status,body]=handler(path,options.method || 'GET',options.body ? JSON.parse(String(options.body)) : undefined);
     return new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
-  }); vi.stubGlobal('fetch',fetcher); return fetcher;
+  });
+  // Each scenario specifies application calls; an anonymous restoration is rejected separately.
+  vi.stubGlobal('fetch',(input:string,options:RequestInit)=>String(input).endsWith('/auth/refresh')
+    ? Promise.resolve(new Response('{}',{status:401})) : fetcher(input,options));return fetcher;
 }
 export function open(path: string) { return render(<MemoryRouter initialEntries={[path]}><App/></MemoryRouter>); }
 afterEach(() => { setAccessToken(null); vi.unstubAllGlobals(); });
@@ -26,10 +29,10 @@ describe('authenticated marketplace routes', () => {
     expect(screen.queryByRole('link', { name: /admin/i })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Create a buyer or seller account' })).toHaveAttribute('href', '/register');
   });
-  it.each(['/admin/login', '/login/admin', '/admin', '/admin/addresses'])('renders separate admin sign-in at %s without fetching protected records', path => {
+  it.each(['/admin/login', '/login/admin', '/admin', '/admin/addresses'])('renders separate admin sign-in at %s without fetching protected records', async path => {
     const fetcher = mockApi(() => [500, {}]);
     open(path);
-    expect(screen.getByRole('heading', { name: 'What Not? Administration' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'What Not? Administration' })).toBeInTheDocument();
     expect(screen.getByLabelText('Email')).toHaveAttribute('type', 'email');
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
@@ -51,7 +54,7 @@ describe('authenticated marketplace routes', () => {
     await userEvent.type(screen.getByLabelText('Password'), crypto.randomUUID());
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByText('admin workspace');
-    expect(fetcher.mock.calls.map(([url]) => new URL(url).pathname)).toContain('/api/v1/auth/me');
+    expect(fetcher.mock.calls.map(([url]) => new URL(url, location.origin).pathname)).toContain('/api/v1/auth/me');
     await userEvent.click(screen.getByRole('button', { name: /log out/i }));
     await screen.findByRole('heading', { name: 'What Not? Administration' });
     expect(getAccessToken()).toBeNull();
@@ -66,7 +69,7 @@ describe('authenticated marketplace routes', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByText(`${role.toLowerCase()} workspace`);
     expect(screen.queryByText('admin workspace')).not.toBeInTheDocument();
-    expect(fetcher.mock.calls.some(([url]) => new URL(url).pathname.startsWith('/api/v1/admin'))).toBe(false);
+    expect(fetcher.mock.calls.some(([url]) => new URL(url, location.origin).pathname.startsWith('/api/v1/admin'))).toBe(false);
   });
   it('validates blank admin login before sending credentials', async () => {
     const fetcher = mockApi(() => [500, {}]);
@@ -86,7 +89,7 @@ describe('authenticated marketplace routes', () => {
     expect(getAccessToken()).toBeNull();
   });
   it('keeps the landing layout and labels sample geography', () => { open('/'); expect(screen.getByRole('heading',{name:/Local life.\s*More possibilities./i})).toBeInTheDocument(); expect(screen.getByText(/sample catalogue.*geography/i)).toBeInTheDocument(); });
-  it('redirects protected pages to login without fetching sensitive records', () => { const fetcher=mockApi(() => [500,{}]); open('/seller'); expect(screen.getByRole('heading',{name:/welcome back/i})).toBeInTheDocument(); expect(fetcher).not.toHaveBeenCalled(); });
+  it('redirects protected pages to login without fetching sensitive records', async () => { const fetcher=mockApi(() => [500,{}]); open('/seller'); expect(await screen.findByRole('heading',{name:/welcome back/i})).toBeInTheDocument(); expect(fetcher).not.toHaveBeenCalled(); });
   it('validates blank login before sending credentials', async () => { const fetcher=mockApi(() => [500,{}]); open('/login/buyer'); await userEvent.click(screen.getByRole('button',{name:/sign in/i})); expect(screen.getByRole('alert')).toHaveTextContent(/email and password/i); expect(fetcher).not.toHaveBeenCalled(); });
   it.each(['BUYER','SELLER','ADMIN'])('routes by auth/me identity rather than chosen login role: %s', async role => {
     mockApi(path => path==='/auth/login' ? [200,{access_token:'test-token',expires_in:900,token_type:'bearer',user:account('BUYER')}] : path==='/auth/me' ? [200,account(role)] : path==='/sellers/me' ? [404,{}] : [200,[]]);

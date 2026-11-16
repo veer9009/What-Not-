@@ -16,13 +16,11 @@ def test_0008_populated_upgrade_metadata_roundtrip_and_verified_refusal(fresh_da
         with engine.begin() as connection:
             uid = connection.scalar(text("INSERT INTO users(name,email,phone,password_hash,role) VALUES('Existing','existing@example.test','resume-user','hash','BUYER') RETURNING id"))
         command.upgrade(config, '0008')
-        command.check(config)
         with engine.connect() as connection:
             assert connection.execute(text('SELECT phone_verified_at,email_verified_at FROM users WHERE id=:id'), {'id': uid}).one() == (None, None)
         command.downgrade(config, '0007')
         assert 'request_quotas' not in inspect(engine).get_table_names()
-        command.upgrade(config, 'head')
-        command.check(config)
+        command.upgrade(config, '0008')
         with engine.begin() as connection:
             connection.execute(text('UPDATE users SET phone_verified_at=now() WHERE id=:id'), {'id': uid})
         with pytest.raises(RuntimeError, match='verification history'):
@@ -30,6 +28,8 @@ def test_0008_populated_upgrade_metadata_roundtrip_and_verified_refusal(fresh_da
         with engine.connect() as connection:
             assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0008'
             assert connection.scalar(text('SELECT phone_verified_at FROM users WHERE id=:id'), {'id': uid}) is not None
+        command.upgrade(config, 'head')
+        command.check(config)
     finally:
         engine.dispose()
 
@@ -54,7 +54,7 @@ def test_property_expiry_is_bounded_notifies_once_and_preserves_confirmed_visits
 def test_readiness_checks_schema_and_reports_backlog_without_pii(auth_client):
     response = auth_client.get('/api/v1/ready')
     assert response.status_code == 200
-    assert response.json()['schema'] == '0009'
+    assert response.json()['schema'] == '0010'
     assert isinstance(response.json()['outbox_pending'], int)
     assert not any(word in response.text for word in ['password', 'email@', 'postgresql://'])
 

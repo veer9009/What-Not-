@@ -1,9 +1,67 @@
 import { apiBaseUrl } from './config';
+import type { TokenResponse, User } from './types';
 
 let credential: string | null = null;
 let generation = 0;
+let account: Pick<User, 'id' | 'role'> | null = null;
+export function bindAccessIdentity(user: User) { account = { id: user.id, role: user.role }; }
 const unauthorizedListeners = new Set<() => void>();
-export function setAccessToken(token: string | null) { credential = token; generation++; }
+let expiresAt: number | null = null;
+let renewal: Promise<TokenResponse> | null = null;
+let cookieQueue: Promise<unknown> = Promise.resolve();
+const tokenListeners = new Set<() => void>();
+export function onTokenChanged(listener: () => void) { tokenListeners.add(listener); return () => { tokenListeners.delete(listener); }; }
+export function accessExpiresAt() { return expiresAt; }
+export function cancelPendingAuth() { generation++; renewal = null; }
+function notifyToken() { tokenListeners.forEach(listener => listener()); }
+export function setAccessToken(token: string | null) { credential = token; account = null; expiresAt = null; generation++; renewal = null; notifyToken(); }
+function serialized<T>(action: () => Promise<T>): Promise<T> {
+  const execute = () => typeof navigator !== 'undefined' && navigator.locks
+    ? navigator.locks.request('what-not-auth-cookie', action) : action();
+  const pending = cookieQueue.catch(() => {}).then(execute);
+  cookieQueue = pending.catch(() => {}); return pending;
+}
+function acceptToken(result: TokenResponse, started: number) {
+  if (generation !== started) throw new ApiError(0, 'Your session changed. Please try again.');
+  if (!result.access_token || result.token_type !== 'bearer' || !Number.isFinite(result.expires_in) || result.expires_in <= 0)
+    throw new ApiError(0, 'The API returned an invalid sign-in response.');
+  if (account && (!result.user || result.user.id !== account.id || result.user.role !== account.role))
+    throw new ApiError(401, 'Your account changed in another tab. Please sign in again.');
+  if (result.user) bindAccessIdentity(result.user);
+  credential = result.access_token; expiresAt = Date.now() + result.expires_in * 1000; notifyToken();
+  return result;
+}
+function invalidate() { setAccessToken(null); unauthorizedListeners.forEach(listener => listener()); }
+export function refreshSession(): Promise<TokenResponse> {
+  if (renewal) return renewal;
+  const started = generation;
+  const hadCredential = credential !== null;
+  const pending = serialized(async () => {
+    if (started !== generation) throw new ApiError(0, 'Your session changed. Please try again.');
+    return acceptToken(await api<TokenResponse>('/auth/refresh', { method: 'POST', auth: false }), started);
+  }).catch(error => {
+    if (started === generation && error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      if (hadCredential) invalidate(); else setAccessToken(null);
+    }
+    throw error;
+  });
+  renewal = pending;
+  void pending.finally(() => { if (renewal === pending) renewal = null; }).catch(() => {});
+  return pending;
+}
+export function loginSession(email: string, password: string) {
+  setAccessToken(null); const started = generation;
+  return serialized(async () => {
+    if (generation !== started) throw new ApiError(0, 'Your session changed. Please try again.');
+    return acceptToken(await api<TokenResponse>('/auth/login', { method: 'POST', body: { email, password }, auth: false }), started);
+  });
+}
+const channel = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('what-not-session') : null;
+if (channel) channel.onmessage = event => { if (event.data === 'logout') invalidate(); };
+export function logoutSession() {
+  setAccessToken(null); channel?.postMessage('logout');
+  return serialized(() => api<void>('/auth/logout', { method: 'POST', auth: false }));
+}
 export function getAccessToken() { return credential; }
 export function onUnauthorized(listener: () => void) { unauthorizedListeners.add(listener); return () => { unauthorizedListeners.delete(listener); }; }
 export class ApiError extends Error {
@@ -45,20 +103,28 @@ export async function api<T>(path: string, { method = 'GET', body, bodyText, aut
     throw new Error('Invalid API path: supply an endpoint without the API prefix.');
   }
   const base = apiBaseUrl(import.meta.env.PROD, import.meta.env.VITE_API_BASE_URL,
-    import.meta.env.DEV ? 'http://127.0.0.1:8000/api/v1' : '/api/v1');
+    '/api/v1');
   const headers = new Headers({ Accept: 'application/json' });
   if (body !== undefined || bodyText !== undefined) headers.set('Content-Type', 'application/json');
   const token = auth ? credential : null;
   const started = generation;
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
+  const cookieAuth = /^\/auth\/(login|refresh|logout)$/.test(path);
+  if (cookieAuth) headers.set('X-WhatNot-CSRF', '1');
   let response: Response;
   let raw: string;
   try {
-    response = await fetch(`${base}${path}`, { method, headers, body: bodyText ?? (body === undefined ? undefined : JSON.stringify(body)), signal, cache: 'no-store', credentials: 'omit' });
+    response = await fetch(`${base}${path}`, { method, headers, body: bodyText ?? (body === undefined ? undefined : JSON.stringify(body)), signal, cache: 'no-store', credentials: cookieAuth ? 'include' : 'omit' });
+    if (auth && token && response.status === 401 && generation === started) {
+      if (credential === token) await refreshSession();
+      if (generation !== started) throw new ApiError(0, 'Your session changed. Please try again.');
+      headers.set('Authorization', `Bearer ${credential}`);
+      response = await fetch(`${base}${path}`, { method, headers, body: bodyText ?? (body === undefined ? undefined : JSON.stringify(body)), signal, cache: 'no-store', credentials: 'omit' });
+    }
     raw = await response.text();
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    if (error instanceof ApiError || (error instanceof DOMException && error.name === 'AbortError')) throw error;
     throw new ApiError(0, 'Unable to reach the marketplace API. Check your connection and try again.');
   }
   if (auth && generation !== started) throw new ApiError(0, 'Your session changed. Please try again.');
@@ -82,3 +148,52 @@ export async function api<T>(path: string, { method = 'GET', body, bodyText, aut
   return data as T;
 }
 export function errorMessage(error: unknown) { return error instanceof ApiError ? error.message : 'Something went wrong. Please try again.'; }
+
+// Binary uploads share the JSON client's base, bearer credentials and session boundary.
+export function uploadBinary<T>(path: string, file: File, progress?: (percent: number) => void, signal?: AbortSignal): Promise<T> {
+  const started = generation;
+  if (credential && expiresAt !== null && expiresAt <= Date.now() + 30000) {
+    return refreshSession().then(() => {
+      if (generation !== started) throw new ApiError(0, 'Your session changed. Please try again.');
+      return sendBinary<T>(path, file, progress, signal);
+    });
+  }
+  return sendBinary<T>(path, file, progress, signal);
+}
+function sendBinary<T>(path: string, file: File, progress?: (percent: number) => void, signal?: AbortSignal): Promise<T> {
+  if (!path.startsWith('/') || path.startsWith('//') || /^\/api(?:\/|$)/.test(path)) throw new Error('Invalid API path');
+  const base = apiBaseUrl(import.meta.env.PROD, import.meta.env.VITE_API_BASE_URL,
+    '/api/v1');
+  const token = credential, started = generation;
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new DOMException('Image upload cancelled.', 'AbortError')); return; }
+    const request = new XMLHttpRequest();
+    const abort = () => request.abort();
+    const cleanup = () => signal?.removeEventListener('abort', abort);
+    const fail = (error: Error) => { cleanup(); reject(error); };
+    request.open('POST', `${base}${path}`);
+    request.timeout = 120000;
+    request.withCredentials = false;
+    request.setRequestHeader('Accept', 'application/json');
+    request.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    if (token) request.setRequestHeader('Authorization', `Bearer ${token}`);
+    request.upload.onprogress = event => {
+      if (!signal?.aborted && generation === started && event.lengthComputable) progress?.(Math.round(event.loaded / event.total * 100));
+    };
+    request.onload = () => {
+      cleanup();
+      if (generation !== started) { reject(new ApiError(0, 'Your session changed. Please try again.')); return; }
+      if (request.status < 200 || request.status >= 300) {
+        if (token && request.status === 401) { setAccessToken(null); unauthorizedListeners.forEach(listener => listener()); }
+        reject(new ApiError(request.status, request.status === 422 ? 'The image could not be decoded or validated. Choose a valid JPG, PNG or WebP image, 5 MiB or smaller.' : messages[request.status] || (request.status === 413 ? 'Each image must be 5 MiB or smaller.' : request.status === 415 ? 'Choose a valid JPG, PNG or WebP image.' : 'Image upload failed. Please try again.'))); return;
+      }
+      try { resolve(parseJson(request.responseText) as T); }
+      catch { reject(new ApiError(0, 'The API returned an invalid response. Please try again.')); }
+    };
+    request.onerror = () => fail(new ApiError(0, 'Unable to upload the image. Check your connection and try again.'));
+    request.onabort = () => fail(new DOMException('Image upload cancelled.', 'AbortError'));
+    request.ontimeout = () => fail(new ApiError(0, 'Image upload timed out. Check your connection and retry the remaining images.'));
+    signal?.addEventListener('abort', abort, { once: true });
+    request.send(file);
+  });
+}

@@ -31,7 +31,8 @@ def test_auth_request_commits_before_response_and_rolls_back_commit_failure(migr
         app = create_app(Settings(_env_file=None, environment='test', jwt_secret_key=SECRET))
         app.dependency_overrides[get_session] = request_session
         try:
-            with TestClient(app) as client:
+            with TestClient(app, base_url='https://testserver',
+                    headers={'Origin': 'https://testserver', 'X-WhatNot-CSRF': '1'}) as client:
                 registered = register(client)
                 assert registered.status_code == 201
                 # The HTTP response means the transaction has already completed.

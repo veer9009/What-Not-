@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import Field, model_validator
 
 from .common import ContractModel, DatabaseId, Money, Name, Price, Quantity
+from .location import Coordinate
 
 
 class OrderStatus(str, Enum):
@@ -86,3 +87,5 @@ class FulfillmentResponse(ContractModel):
     city: str
     state: str
     pincode: str
+    delivery_location: Coordinate | None = None
+    delivery_location_confirmed: bool = False

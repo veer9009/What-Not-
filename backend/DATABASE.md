@@ -66,7 +66,8 @@ erDiagram
 - `products` belongs to a seller profile and stores listing details, price, stock,
   category, radius, moderation state, rejection reason, activity and timestamps.
 - `product_images` stores URL strings, primary flag, sort order and creation time.
-  It stores no binary images and provides no upload service.
+  It stores no binary images. Product uploads reuse these rows with private storage
+  references; see [image storage and delivery](../docs/PRODUCT_IMAGE_UPLOAD.md).
 - `addresses` belongs to a user and stores label, address lines, locality, pincode,
   required coordinates, default flag and timestamps.
 - `orders` references a buyer, seller profile and address, with status, subtotal,

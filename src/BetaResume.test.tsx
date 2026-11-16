@@ -10,7 +10,7 @@ it('submits the exact product revision reviewed by the administrator',async()=>{
   setAccessToken('test');const writes:unknown[]=[];
   const updated_at='2026-11-03T12:00:00.123456Z';
   vi.stubGlobal('fetch',async(input:string,options:RequestInit)=>{
-    const path=new URL(input).pathname;
+    const path=new URL(input, location.origin).pathname;
     if(options.method==='POST')writes.push(JSON.parse(String(options.body)));
     const data=path.endsWith('/auth/me')?{id:1,name:'Admin',role:'ADMIN',email:'admin@example.test'}:
       options.method==='POST'?{}:[{id:3,seller_id:2,name:'Reviewed vase',description:'Clay',price:'10.00',stock_quantity:1,category:'Crafts',delivery_radius_km:1,status:'PENDING',is_active:true,updated_at}];

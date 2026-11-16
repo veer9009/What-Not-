@@ -70,7 +70,7 @@ def test_successful_bootstrap_uses_existing_service_with_argon2_admin_input(monk
     from app.schemas.auth import UserRegistration
     session = Mock()
     session.execute.return_value.one.return_value = ('whatnot_pilot', 'whatnot_runtime', '127.0.0.1', 5432, 123)
-    session.scalar.side_effect = ['0009', 0]
+    session.scalar.side_effect = ['0010', 0]
     service = Mock()
     monkeypatch.setattr('app.bootstrap_admin.UserService', lambda bound: service)
     details = UserRegistration(name='Unit Operator', email='pilot0@example.com', phone='synthetic',

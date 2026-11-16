@@ -10,6 +10,8 @@ MAX_MONEY = Decimal('9999999999.99')
 Quantity = Annotated[int, Field(strict=True, gt=0, le=MAX_INTEGER)]
 Money = Annotated[Decimal, Field(ge=0, le=MAX_MONEY, decimal_places=2, allow_inf_nan=False)]
 Price = Annotated[Decimal, Field(gt=0, le=MAX_MONEY, decimal_places=2, allow_inf_nan=False)]
+Latitude = Annotated[Decimal, Field(ge=-90, le=90, decimal_places=6, allow_inf_nan=False)]
+Longitude = Annotated[Decimal, Field(ge=-180, le=180, decimal_places=6, allow_inf_nan=False)]
 Name = Annotated[str, Field(min_length=1, max_length=120)]
 
 

@@ -1,4 +1,6 @@
 from pydantic import TypeAdapter
+from fastapi import HTTPException
+from urllib.parse import urlsplit
 from sqlalchemy.orm import Session
 
 from app.models import Product, ProductImage
@@ -19,20 +21,34 @@ def require_product(session, product_id, *, lock=False):
     return product
 
 
-def set_primary_image(product, image_url):
+def set_primary_image(product, image_url, settings=None):
     primary = next((image for image in product.images if image.is_primary), None)
+    if primary is not None and image_url is not None and settings is not None:
+        from app.storage.product_images import image_key
+        key = image_key(primary.image_url)
+        incoming, origin = urlsplit(str(image_url)), urlsplit(settings.image_delivery_origin)
+        # Legacy full-form clients echo the primary URL. Keep the private
+        # attachment rather than persist its transient delivery capability.
+        incoming_origin = (incoming.scheme, incoming.hostname, incoming.port or (443 if incoming.scheme == 'https' else 80))
+        configured_origin = (origin.scheme, origin.hostname, origin.port or (443 if origin.scheme == 'https' else 80))
+        if (key is not None and incoming_origin == configured_origin
+                and incoming.path == f'/api/v1/product-images/{key}'):
+            return
     if image_url is None:
         if primary is not None:
             product.images.remove(primary)
     elif primary is not None:
         primary.image_url = str(image_url)
     else:
+        if len(product.images) >= 5:
+            raise HTTPException(409, 'A product can have at most five images')
         product.images.append(ProductImage(image_url=str(image_url), is_primary=True, sort_order=0))
 
 
 class ProductService:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, settings=None):
         self.session = session
+        self.settings = settings
         self.repository = ProductRepository(session)
 
     @write_operation
@@ -43,7 +59,7 @@ class ProductService:
         values = data.model_dump(exclude={'image_url'})
         values['category'] = data.category.value
         product = Product(seller_id=seller_id, status='PENDING', rejection_reason=None, is_active=True, **values)
-        set_primary_image(product, data.image_url)
+        set_primary_image(product, data.image_url, self.settings)
         return self.repository.add(product)
 
     def get(self, product_id: int):
@@ -70,7 +86,7 @@ class ProductService:
         product = self._owned_locked(actor_id, product_id)
         for key, value in data.model_dump(exclude_unset=True).items():
             if key == 'image_url':
-                set_primary_image(product, value)
+                set_primary_image(product, value, self.settings)
             else:
                 setattr(product, key, value.value if key == 'category' else value)
         if product.status == 'APPROVED':

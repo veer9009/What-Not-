@@ -1,4 +1,5 @@
 import secrets
+from contextvars import ContextVar
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,14 +15,21 @@ SECRET = 'isolated-test-key-only-' + 'x' * 40
 REGISTRATION = dict(name='Ravi', email='Ravi@Example.com', phone='9000000001',
                     password=PASSWORD, role='SELLER')
 
+active_auth_db = ContextVar('active_auth_db')
+
 
 @pytest.fixture
 def auth_client(db):
     app = create_app(Settings(_env_file=None, environment='test', jwt_secret_key=SECRET))
     app.dependency_overrides[get_session] = lambda: db
     app.dependency_overrides[get_transaction_session] = lambda: db
-    with TestClient(app) as client:
-        yield client
+    context = active_auth_db.set(db)
+    try:
+        with TestClient(app, base_url='https://testserver',
+                headers={'Origin': 'https://testserver', 'X-WhatNot-CSRF': '1'}) as client:
+            yield client
+    finally:
+        active_auth_db.reset(context)
 
 
 def register(client, **changes):

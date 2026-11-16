@@ -35,8 +35,8 @@ Copy-Item .env.example .env.local
 corepack pnpm dev --host 127.0.0.1
 ```
 
-The frontend configuration is public `VITE_API_BASE_URL`, defaulting centrally to
-`http://127.0.0.1:8000/api/v1`. Preserve existing environment files. Configure the
+The frontend configuration is public `VITE_API_BASE_URL`, defaulting to same-origin
+`/api/v1` through the Vite development proxy to `127.0.0.1:8000`. Preserve existing environment files. Configure the
 backend separately with a dedicated application database and private signing key,
 following [database setup](backend/DATABASE.md) and
 [authentication setup](backend/AUTHENTICATION.md). No database is provisioned or
@@ -51,20 +51,25 @@ Use real registered credentials. Public registration offers BUYER and SELLER;
 SELLER must then create a complete shop profile. ADMIN accounts come from the
 existing trusted operator workflow. Workspace selection never grants a role.
 
-Tokens remain only in browser memory. A reload/new tab requires login again;
-logout and expiry clear identity, credentials, mounted records and the sample cart.
-See the integration guide for the strategy, examples and security tradeoffs.
+Access tokens remain only in browser memory and last 15 minutes. An HttpOnly,
+Secure refresh cookie restores eligible sessions after reload: up to eight hours
+for buyers/sellers and 15 minutes for admins, without sliding extension. Logout
+revokes the server session and clears local identity. See the
+[refresh-session handoff](docs/REFRESH_SESSION_IMPLEMENTATION.md) for migration,
+verification and browser requirements. Migration 0010 requires separate approval.
 
 Default CORS permits only localhost/127.0.0.1 on port 5173. Other development or
 production origins require an explicit `WHAT_NOT_CORS_ORIGINS` JSON list. Production
-requires HTTPS and a configured frontend API URL; no wildcard CORS is used.
+requires HTTPS and a same-site API (prefer same-origin `/api/v1`); no wildcard CORS
+is used. Reliable concurrent-tab renewal requires browser Web Locks support.
 
 ## Current workflows
 
 - Real registration, login, `/auth/me`, logout and role-protected routes.
 - Complete own seller profile creation/update, own products, create/edit, activation,
-  rejection reasons and resubmission. HTTP(S) image URLs are supported; uploads and
-  deletion are not available.
+  rejection reasons and resubmission. Sellers can upload up to five JPG/PNG/WebP
+  product images, replace/remove them and choose a primary image. Existing hosted
+  URLs and legacy API inputs remain supported. See [private image storage](docs/PRODUCT_IMAGE_UPLOAD.md).
 - Real ADMIN pending queue, approval and rejection with required reason. Fake counts,
   earnings and commission controls are removed.
 - Own addresses, partial edits and default selection; historical delivery fields

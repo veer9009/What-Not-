@@ -1,5 +1,13 @@
 # React and FastAPI integration
 
+Session storage and reload descriptions below are historical. The current client
+keeps access tokens in memory, automatically renews through an HttpOnly Secure
+SameSite Strict cookie, and restores eligible sessions after page reload. The API
+defaults to same-origin `/api/v1` (Vite proxies development requests). Production
+requires HTTPS and a same-site API. See the
+[refresh-session handoff](REFRESH_SESSION_IMPLEMENTATION.md) for current behavior,
+Web Locks compatibility, migration prerequisites and manual verification.
+
 Current controlled-beta integration supersedes the historical descriptions below.
 Homemade checkout, sale property workflows, Creative Services, notifications and
 admin operations use live APIs for approved accounts. Product samples stay separate.

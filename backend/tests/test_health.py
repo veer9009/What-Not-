@@ -43,7 +43,7 @@ def test_local_cors_preflight(client):
     response = client.options("/api/v1/products", headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"})
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
-    assert "access-control-allow-credentials" not in response.headers
+    assert response.headers["access-control-allow-credentials"] == "true"
     rejected = client.options("/api/v1/products", headers={"Origin": "https://unlisted.example", "Access-Control-Request-Method": "POST"})
     assert rejected.status_code == 400
     assert "access-control-allow-origin" not in rejected.headers

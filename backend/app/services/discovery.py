@@ -19,8 +19,9 @@ def locality_center(latitude, longitude):
 
 
 class DiscoveryService:
-    def __init__(self, session):
+    def __init__(self, session, settings=None):
         self.session = session
+        self.settings = settings
         self.repository = ProductRepository(session)
 
     def _location(self, actor_id, source):
@@ -53,7 +54,7 @@ class DiscoveryService:
         return BuyerProduct(id=product.id, seller_id=product.seller_id, name=product.name, description=product.description,
             price=product.price, stock_quantity=product.stock_quantity, category=product.category,
             delivery_radius_km=product.delivery_radius_km,
-            image_url=safe_product_image_url(next((i.image_url for i in product.images if i.is_primary), None)),
+            image_url=safe_product_image_url(next((i.image_url for i in product.images if i.is_primary), None), self.settings),
             shop_name=seller.shop_name, is_verified=seller.is_verified)
 
     def list(self, actor_id: int, query: DiscoveryQuery) -> list[BuyerProduct]:

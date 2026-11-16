@@ -49,14 +49,21 @@ def dummy_password_hash() -> str:
     return hash_password(secrets.token_urlsafe(32))
 
 
-def create_access_token(user_id: int, settings: Settings) -> str:
+def create_access_token(user_id: int, settings: Settings, session_id: str | None = None) -> str:
     now = int(datetime.now(timezone.utc).timestamp())
-    return jwt.encode({'sub': str(user_id), 'iat': now,
-                       'exp': now + settings.access_token_expire_minutes * 60},
+    claims = {'sub': str(user_id), 'iat': now,
+              'exp': now + (900 if session_id is not None else settings.access_token_expire_minutes * 60)}
+    if session_id is not None:
+        claims['sid'] = session_id
+    return jwt.encode(claims,
                       signing_key(settings), algorithm=settings.jwt_algorithm)
 
 
 def decode_access_token(token: str, settings: Settings) -> int:
+    return int(decode_access_claims(token, settings)['sub'])
+
+
+def decode_access_claims(token: str, settings: Settings) -> dict:
     key = signing_key(settings)
     try:
         claims = jwt.decode(token, key, algorithms=[settings.jwt_algorithm],
@@ -69,6 +76,8 @@ def decode_access_token(token: str, settings: Settings) -> int:
             raise InvalidCredentials()
         if type(claims['iat']) is not int or type(claims['exp']) is not int or claims['exp'] <= claims['iat']:
             raise InvalidCredentials()
-        return user_id
+        if 'sid' in claims and (not isinstance(claims['sid'], str) or not re.fullmatch(r'[0-9a-f]{32}', claims['sid'])):
+            raise InvalidCredentials()
+        return claims
     except jwt.InvalidTokenError:
         raise InvalidCredentials() from None

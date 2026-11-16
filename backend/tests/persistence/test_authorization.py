@@ -5,10 +5,16 @@ import pytest
 from sqlalchemy import select
 
 from app.models import User
-from test_authentication import auth_client, register, login, SECRET, PASSWORD
+from test_authentication import auth_client, register, login, SECRET, PASSWORD, active_auth_db
 
 
 def bearer(user_id, **claims):
+    from app.services.refresh_sessions import RefreshSessionService
+    db = active_auth_db.get()
+    user = db.get(User, user_id)
+    if user is not None:
+        family, _ = RefreshSessionService(db).create(user)
+        claims = {'sid': family.id, **claims}
     token = jwt.encode(dict(sub=str(user_id), iat=int(time.time()),
                             exp=int(time.time()) + 900, **claims), SECRET, algorithm='HS256')
     return {'Authorization': f'Bearer {token}'}
@@ -106,7 +112,7 @@ def test_changed_database_role_and_activity_take_effect(auth_client, db, records
     records['seller_user'].role = 'BUYER'
     db.flush()
     assert auth_client.patch(f'/api/v1/products/{product_id}', headers=headers,
-                             json={'name': 'Edit'}).status_code == 403
+                             json={'name': 'Edit'}).status_code == 401
     records['seller_user'].is_active = False
     db.flush()
     assert auth_client.patch(f'/api/v1/products/{product_id}', headers=headers,
@@ -122,25 +128,27 @@ def test_changed_database_role_and_activity_take_effect(auth_client, db, records
     ({}, 'HS384', SECRET),
 ])
 def test_jwt_invalid_claims_signature_algorithm_and_nonexistent_user(auth_client, records, claims, algorithm, key):
-    payload = {'sub': str(records['buyer'].id), 'iat': int(time.time()), 'exp': int(time.time()) + 900, **claims}
+    valid_token = bearer(records['buyer'].id)['Authorization'].removeprefix('Bearer ')
+    payload = {**jwt.decode(valid_token, SECRET, algorithms=['HS256']), **claims}
     token = jwt.encode(payload, key, algorithm=algorithm)
     response = auth_client.get('/api/v1/auth/me', headers={'Authorization': f'Bearer {token}'})
     assert response.status_code == 401
 
 
-@pytest.mark.parametrize('missing', ['sub', 'iat', 'exp'])
-def test_jwt_requires_each_claim(auth_client, missing):
-    claims = {'sub': '1', 'iat': int(time.time()), 'exp': int(time.time()) + 900}
+@pytest.mark.parametrize('missing', ['sub', 'iat', 'exp', 'sid'])
+def test_jwt_requires_each_claim(auth_client, records, missing):
+    valid_token = bearer(records['buyer'].id)['Authorization'].removeprefix('Bearer ')
+    claims = jwt.decode(valid_token, SECRET, algorithms=['HS256'])
     del claims[missing]
     token = jwt.encode(claims, SECRET, algorithm='HS256')
     assert auth_client.get('/api/v1/auth/me', headers={'Authorization': f'Bearer {token}'}).status_code == 401
 
 
-def test_token_contains_only_identity_and_time_claims(auth_client):
+def test_token_contains_only_identity_session_and_time_claims(auth_client):
     register(auth_client)
     token = login(auth_client).json()['access_token']
     claims = jwt.decode(token, SECRET, algorithms=['HS256'])
-    assert set(claims) == {'sub', 'iat', 'exp'}
+    assert set(claims) == {'sub', 'sid', 'iat', 'exp'}
     assert claims['exp'] - claims['iat'] == 900
 
 

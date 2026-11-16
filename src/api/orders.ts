@@ -1,9 +1,10 @@
 import { api, identifier } from './client';
-import type { Fulfillment, Id, Order, OrderCreate, OrderStatus } from './types';
+import type { DeliveryLocation, Fulfillment, Id, Order, OrderCreate, OrderStatus } from './types';
 
 export const ordersApi = {
   list: (offset=0) => api<Order[]>(`/orders?offset=${offset}&limit=50`),
   fulfillment: (id: Id) => api<Fulfillment>(`/orders/${identifier(id)}/fulfillment`),
+  confirmDeliveryLocation: (id: Id, point: DeliveryLocation) => api<Fulfillment>(`/orders/${identifier(id)}/delivery-location-confirmation`, {method:'POST',body:point}),
   get: (id: Id) => api<Order>(`/orders/${identifier(id)}`),
   create: (input: OrderCreate, idempotencyKey: string) => {
     // Emit validated IDs as exact JSON integers, preserving PostgreSQL BIGINT precision.

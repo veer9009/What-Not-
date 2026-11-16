@@ -23,7 +23,7 @@ export function LoginPage({administration=false}:{administration?:boolean}){
     {(error||auth.error)&&<ErrorNotice message={error||auth.error}/>}
     <button className="btn btn-primary wide" disabled={busy}>{busy?'Signing in...':'Sign in'}</button>
     {!administration&&<p><Link className="text-link" to="/register">Create account</Link></p>}
-    <CollectionNotice label="Sign-in">Your email and password are sent to the API for authentication. Security rate limits use account and request-source information.</CollectionNotice><small>Sessions expire automatically. Reloading this page requires signing in again.</small>
+    <CollectionNotice label="Sign-in">Your email and password are sent to the API for authentication. Security rate limits use account and request-source information.</CollectionNotice><small>Sessions restore securely after reload and expire automatically. Buyer and seller sessions last up to 8 hours; administrator sessions last up to 15 minutes.</small>
   </form>;
   if(administration)return <main id="main-content" tabIndex={-1} className="login-page"><div className="login-brand"><Logo/></div><div className="login-form-wrap admin-login-form">{loginForm}</div></main>;
   return <main id="main-content" tabIndex={-1} className="login-split clay"><div className="login-aside"><Logo/><div><p className="eyebrow">Your neighbourhood marketplace</p><h1>Welcome to What Not?</h1><p>Connect with local makers. Sign in to manage your account.</p></div></div><div className="login-form-wrap"><Link to="/login">Back to workspace selection</Link>{loginForm}</div></main>;

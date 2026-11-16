@@ -79,6 +79,13 @@ class ProductUpdate(ContractModel):
         return data
 
 
+class ProductImageResponse(ContractModel):
+    id: DatabaseId
+    image_url: ImageURL
+    is_primary: bool
+    sort_order: int
+
+
 class ProductResponse(ProductCreate):
     id: DatabaseId
     seller_id: DatabaseId
@@ -86,6 +93,7 @@ class ProductResponse(ProductCreate):
     rejection_reason: RejectionReason | None = None
     is_active: Annotated[bool, Field(strict=True)] = True
     updated_at: AwareDatetime | None = None
+    images: list[ProductImageResponse] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_rejection_reason(self):

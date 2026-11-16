@@ -8,7 +8,7 @@ import { setAccessToken } from './api/client';
 function open(path = '/', role?: 'BUYER' | 'SELLER') {
   if (role) setAccessToken('scope-test');
   const fetcher = vi.fn(async (input: string) => {
-    const path = new URL(input).pathname;
+    const path = new URL(input, location.origin).pathname;
     const body = path.endsWith('/auth/me')
       ? { id: 1, name: 'Ravi', email: 'ravi@example.test', role }
       : path.endsWith('/sellers/me') ? { id: 2, shop_name: 'Ravi Studio' } : [];

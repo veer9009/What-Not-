@@ -14,7 +14,7 @@ function setup({ role = 'BUYER', status = 'DELIVERED', path = `/${role.toLowerCa
   const wait = new Promise<void>(resolve => { release = resolve; });
   const writes: { path: string; method: string; body: unknown }[] = [];
   const fetcher = vi.fn(async (input: string, options: RequestInit) => {
-    const route = new URL(input).pathname.replace('/api/v1', '');
+    const route = new URL(input, location.origin).pathname.replace('/api/v1', '');
     let data: unknown;
     let code = 200;
     if (route === '/auth/me') data = { id: 1, name: 'Buyer', email: 'private@example.test', role };

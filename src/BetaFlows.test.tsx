@@ -12,7 +12,7 @@ function orderSetup(role='BUYER', status='DELIVERED') {
   const writes: unknown[]=[];
   setAccessToken('beta-test');
   vi.stubGlobal('fetch', vi.fn(async(input:string, options:RequestInit)=>{
-    const path=new URL(input).pathname.replace('/api/v1','');
+    const path=new URL(input, location.origin).pathname.replace('/api/v1','');
     let data:unknown;
     if(path==='/auth/me')data={id:1,name:'Tester',email:'tester@example.com',role};
     else if(path.endsWith('/fulfillment'))data={recipient_name:'Buyer',phone:'9000000000',address_line1:'Private delivery lane',city:'City',state:'State',pincode:'400001'};
@@ -52,7 +52,7 @@ it('seller can retrieve only the active order fulfillment view',async()=>{
 it('discovery explains checkout eligibility without showing private point distance',async()=>{
   setAccessToken('beta-test');
   vi.stubGlobal('fetch',vi.fn(async(input:string)=>{
-    const path=new URL(input).pathname;
+    const path=new URL(input, location.origin).pathname;
     const data=path.endsWith('/auth/me')?{id:1,name:'Buyer',email:'buyer@example.com',role:'BUYER'}:
       path.endsWith('/addresses')?[]:[{id:3,seller_id:2,name:'Nearby vase',description:'Clay',price:'10.00',stock_quantity:1,
         category:'Crafts',delivery_radius_km:1,image_url:null,shop_name:'Maker',is_verified:false,delivery_eligibility:'CONFIRMED_AT_CHECKOUT'}];
@@ -72,7 +72,7 @@ it('seller reads persisted notifications and clears the unread count through the
   setAccessToken('beta-test');let read=false;
   const writes:string[]=[];
   vi.stubGlobal('fetch',vi.fn(async(input:string,options:RequestInit)=>{
-    const path=new URL(input).pathname.replace('/api/v1','');
+    const path=new URL(input, location.origin).pathname.replace('/api/v1','');
     if(options.method==='PATCH'){read=true;writes.push(path);}
     const data=path==='/auth/me'?{id:1,name:'Maker',email:'maker@example.com',role:'SELLER'}:
       path.endsWith('/unread-count')?{count:read?0:1}:

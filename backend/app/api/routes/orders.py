@@ -8,6 +8,7 @@ from app.api.dependencies import Buyer, OrderActor, TransactionSession, current_
 from app.services.inputs import OrderPlacement
 from app.services.orders import OrderService
 from app.services.mappers import order_response
+from app.schemas.location import Coordinate
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -45,3 +46,8 @@ def update_order_status(order_id: IdentifierPath, payload: OrderStatusUpdate, us
 @router.get('/{order_id}/fulfillment', response_model=FulfillmentResponse)
 def fulfillment(order_id: IdentifierPath, user: OrderActor, session: TransactionSession):
     return OrderService(session).fulfillment(user.id, order_id)
+
+
+@router.post('/{order_id}/delivery-location-confirmation', response_model=FulfillmentResponse)
+def confirm_delivery_location(order_id: IdentifierPath, payload: Coordinate, user: Buyer, session: TransactionSession):
+    return OrderService(session).confirm_delivery_location(user.id, order_id, payload)

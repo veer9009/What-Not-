@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.api.dependencies import Seller, TransactionSession, current_seller_profile
 from app.schemas.marketplace import SellerResponse, seller_response
@@ -47,6 +47,6 @@ def update_profile(payload: SellerUpdate, user: Seller, session: TransactionSess
 
 
 @router.get('/me/products', response_model=list[ProductResponse], description='List owned seller products, without implying buyer delivery eligibility.')
-def list_products(user: Seller, session: TransactionSession):
+def list_products(user: Seller, session: TransactionSession, request: Request):
     profile = current_seller_profile(session, user.id)
-    return [product_response(product) for product in SellerService(session).list_products(user.id, profile.id)]
+    return [product_response(product, request.app.state.settings) for product in SellerService(session).list_products(user.id, profile.id)]

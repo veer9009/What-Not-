@@ -105,12 +105,16 @@ def isolated_cluster():
 
 
 @pytest.fixture
-def fresh_database_url(isolated_cluster):
+def fresh_database_url(request):
+    if request.config.getoption('--persistence-isolated-schema', default=False):
+        yield request.getfixturevalue('persistence_fresh_schema_url')
+        return
+    isolated_cluster = request.getfixturevalue('isolated_cluster')
     name = "whatnot_test_" + uuid4().hex
     assert name not in {"whatnot_db", "upsc_compass"}
     with psycopg.connect(**isolated_cluster, autocommit=True) as connection:
         connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
-    return URL.create("postgresql+psycopg", username=isolated_cluster["user"],
+    yield URL.create("postgresql+psycopg", username=isolated_cluster["user"],
                       password=isolated_cluster["password"], host="127.0.0.1",
                       port=isolated_cluster["port"], database=name)
 
@@ -123,7 +127,11 @@ def migration_config(url):
 
 
 @pytest.fixture(scope="session")
-def migrated_engine(isolated_cluster):
+def migrated_engine(request):
+    if request.config.getoption('--persistence-isolated-schema', default=False):
+        yield request.getfixturevalue('persistence_migrated_schema_engine')
+        return
+    isolated_cluster = request.getfixturevalue('isolated_cluster')
     name = "whatnot_test_suite"
     with psycopg.connect(**isolated_cluster, autocommit=True) as connection:
         connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))

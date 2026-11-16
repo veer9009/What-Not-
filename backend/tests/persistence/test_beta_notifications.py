@@ -31,7 +31,8 @@ def test_fulfillment_http_ownership_state_and_no_coordinates(auth_client, db, re
     db.flush()
     result = auth_client.get(route, headers=seller)
     assert result.status_code == 200
-    assert set(result.json()) == {'recipient_name', 'phone', 'address_line1', 'address_line2', 'city', 'state', 'pincode'}
+    assert set(result.json()) == {'recipient_name', 'phone', 'address_line1', 'address_line2', 'city', 'state', 'pincode', 'delivery_location', 'delivery_location_confirmed'}
+    assert result.json()['delivery_location'] is None
     order.status = 'COMPLETED'
     db.flush()
     assert auth_client.get(route, headers=seller).status_code == 403

@@ -8,7 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.db.session import build_engine
-from app.core.security import decode_access_token, InvalidCredentials
+from app.core.security import decode_access_claims, InvalidCredentials
 from app.models import User
 from app.repositories.users import UserRepository
 from app.services.errors import SellerNotFound
@@ -46,22 +46,28 @@ def unauthorized():
 
 
 def get_access_subject(request: Request,
-                       credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)) -> int:
+                       credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)) -> dict:
     if credentials is None:
         raise unauthorized()
     token = credentials.credentials
     if len(token) > 4096 or token.count('.') != 2:
         raise unauthorized()
     try:
-        return decode_access_token(token, request.app.state.settings)
+        claims = decode_access_claims(token, request.app.state.settings)
+        if 'sid' not in claims:
+            raise InvalidCredentials()
+        return claims
     except InvalidCredentials:
         raise unauthorized() from None
 
 
-def get_current_user(request: Request, subject: int = Depends(get_access_subject),
+def get_current_user(request: Request, subject: dict = Depends(get_access_subject),
                      session: Session = Depends(get_transaction_session, scope='function')) -> User:
-    user = UserRepository(session).get(subject)
+    user = UserRepository(session).get(int(subject['sub']))
     if user is None or not user.is_active:
+        raise unauthorized()
+    from app.services.refresh_sessions import RefreshSessionService
+    if not RefreshSessionService(session).valid(subject['sid'], user):
         raise unauthorized()
     from app.services.abuse import require_beta_admission
     require_beta_admission(request.app.state.settings,user.email)

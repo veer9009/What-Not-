@@ -37,6 +37,7 @@ def check_action_limit(session, settings, action, subject):
     limits = {'checkout': (settings.checkout_daily_limit, 86400),
               'address': (settings.address_daily_limit, 86400),
               'discovery': (settings.discovery_hourly_limit, 3600),
+              'image_upload': (settings.image_upload_hourly_limit, 3600),
               'auth': (settings.auth_quarter_hour_limit, 900)}
     limit, window = limits[action]
     consume_quota(session.get_bind().engine, f'{action}:{subject}', limit, window)

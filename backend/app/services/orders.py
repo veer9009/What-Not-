@@ -15,6 +15,7 @@ from app.repositories.orders import OrderRepository
 from app.repositories.products import ProductRepository
 from app.schemas.common import MAX_INTEGER, MAX_MONEY, Money
 from app.schemas.order import OrderStatus
+from app.schemas.location import Coordinate
 from app.services.addresses import owned_address
 from app.services.errors import (AmountOverflow, DeliveryIneligible, IdempotencyConflict, InsufficientStock, InvalidOrderTransition,
     OrderNotFound, OwnershipError, ProductNotFound, ProductUnavailable)
@@ -205,6 +206,37 @@ class OrderService:
                 count += 1
         return count
 
+    def _delivery_location_confirmed(self, order):
+        return self.session.scalar(select(AuditEvent.id).where(
+            AuditEvent.entity_type == 'order', AuditEvent.entity_id == order.id,
+            AuditEvent.actor_id == order.buyer_id,
+            AuditEvent.action == 'DELIVERY_LOCATION_CONFIRMED').limit(1)) is not None
+
+    @write_operation
+    def confirm_delivery_location(self, actor_id, order_id, point):
+        point = Coordinate.model_validate(point)
+        actor = require_user(self.session, actor_id, role='BUYER', lock=True)
+        order = self.repository.get(order_id, lock=True)
+        if order is None:
+            raise OrderNotFound('Order does not exist')
+        self._owned(actor, order)
+        if order.status not in {'PLACED', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY'}:
+            raise InvalidOrderTransition('Delivery location confirmation is unavailable for this order status')
+        address = order.address
+        try:
+            saved_point = Coordinate(latitude=address.latitude, longitude=address.longitude)
+        except (ValueError, TypeError):
+            raise InvalidOrderTransition('No valid saved delivery location is available') from None
+        if point != saved_point:
+            raise InvalidOrderTransition('Review the saved delivery location before confirming')
+        if not self._delivery_location_confirmed(order):
+            # Address delivery fields are immutable once referenced by an order.
+            # Record consent only; never put coordinates in audit reasons or logs.
+            self.session.add(AuditEvent(actor_id=actor_id, entity_type='order', entity_id=order.id,
+                action='DELIVERY_LOCATION_CONFIRMED', reason='Buyer confirmed the saved order delivery point for seller navigation'))
+            self.session.flush()
+        return self.fulfillment(actor_id, order_id)
+
     def fulfillment(self, actor_id, order_id, reason=None):
         actor = require_user(self.session, actor_id)
         order = self.repository.get(order_id)
@@ -220,9 +252,18 @@ class OrderService:
             if role == 'SELLER' and order.status not in {'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED', 'DELIVERY_DISPUTED'}:
                 raise OwnershipError('Fulfillment information is unavailable for this order status')
         address = order.address
+        confirmed = self._delivery_location_confirmed(order)
+        point = None
+        if actor.role == 'BUYER' or (actor.role == 'SELLER' and confirmed):
+            try:
+                point = Coordinate(latitude=address.latitude, longitude=address.longitude).model_dump()
+            except (ValueError, TypeError):
+                # Historical records without a usable point keep postal delivery.
+                pass
         return dict(recipient_name=order.buyer.name, phone=order.buyer.phone,
             address_line1=address.address_line1, address_line2=address.address_line2,
-            city=address.city, state=address.state, pincode=address.pincode)
+            city=address.city, state=address.state, pincode=address.pincode,
+            delivery_location=point, delivery_location_confirmed=confirmed)
 
     @write_operation
     def admin_resolve(self, actor_id, order_id, action, reason):

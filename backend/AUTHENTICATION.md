@@ -1,5 +1,14 @@
 # Authentication and authorization — Phase 5
 
+This is the historical Phase 5 reference. The current secure-session implementation
+supersedes the no-refresh/no-logout and no-migration statements below: access JWTs
+include a server session ID, expire after 15 minutes, and require an active database
+session on every protected request. Rotating hashed refresh sessions have absolute
+eight-hour buyer/seller and 15-minute admin limits. Cookie-changing login, refresh
+and logout require an approved Origin and `X-WhatNot-CSRF: 1`. See the
+[current implementation and migration handoff](../docs/REFRESH_SESSION_IMPLEMENTATION.md).
+Migration 0010 is prepared; application requires separate approval.
+
 The frontend remains a separate demo. This phase changes only backend behavior.
 No migration is needed: the existing User already has `password_hash`, `role`,
 and `is_active`. No startup migrations or database creation occur.

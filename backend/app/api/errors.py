@@ -8,6 +8,7 @@ from app.core.security import AuthenticationUnavailable, InvalidCredentials
 from app.services import errors
 from app.services.abuse import RateLimitExceeded
 import logging
+import re
 
 logger = logging.getLogger('whatnot.api')
 
@@ -48,7 +49,14 @@ def install_error_handlers(app):
 
     @app.exception_handler(SQLAlchemyError)
     async def storage_error(request, exc):
-        logger.error('storage_operation_failed', extra={'error_code':type(exc).__name__})
+        # SQLSTATE identifies schema/connection failures without logging SQL,
+        # parameters, driver messages, or credentials.
+        sqlstate = getattr(getattr(exc, 'orig', None), 'sqlstate', None)
+        if not isinstance(sqlstate, str) or not re.fullmatch(r'[0-9A-Z]{5}', sqlstate):
+            sqlstate = None
+        logger.error('storage_operation_failed error_code=%s sqlstate=%s',
+                     type(exc).__name__, sqlstate,
+                     extra={'error_code':type(exc).__name__, 'sqlstate':sqlstate})
         return JSONResponse(status_code=503, content={'detail': 'Storage operation is unavailable'})
 
     @app.exception_handler(RequestValidationError)

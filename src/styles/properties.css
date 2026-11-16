@@ -1,0 +1,16 @@
+.property-workspace { max-width: 100%; gap: 1.5rem; }
+.property-workspace .panel { min-width: 0; overflow-wrap: anywhere; }
+.property-workspace form { margin-block: 1rem; }
+.property-workspace label { min-width: 0; }
+.property-workspace input, .property-workspace select, .property-workspace textarea { min-width: 0; font: inherit; }
+.property-workspace .checkbox-field { display: flex; align-items: flex-start; gap: .75rem; line-height: 1.6; }
+.property-workspace .checkbox-field input { width: 1.2rem; height: 1.2rem; flex: 0 0 auto; margin-top: .15rem; padding: 0; }
+.property-workspace .approval-help { margin-block: 0 .75rem; }
+.property-workspace .btn { margin: .25rem; }
+.property-workspace .filter-row { flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .property-workspace .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .property-workspace .form-actions { justify-content: stretch; }
+  .property-workspace .form-actions .btn { flex: 1 1 12rem; }
+}
+.dash-shell .property-nav { display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: .65rem; margin-bottom: 1rem; }

@@ -6,6 +6,32 @@ import { propertyDraft, reportReasons, PropertyDetailPage, PropertyRequestsPage,
 import { propertiesApi, type PropertyProfile } from '../api/properties';
 vi.mock('../state/AuthContext',()=>({useAuth:()=>({user:{role:'BUYER',name:'Buyer'},logout:vi.fn()})}));
 afterEach(()=>vi.restoreAllMocks());
+it('uses accessible grouped property forms and readable public/private guidance',async()=>{
+  vi.spyOn(propertiesApi,'mine').mockResolvedValue([]);
+  vi.spyOn(propertiesApi,'profile').mockResolvedValue({display_name:'Owner',capacity:'OWNER',share_contact:false});
+  const {container}=render(<MemoryRouter><PropertyManagePage/></MemoryRouter>);
+  await screen.findByLabelText('Public display name');
+  expect(screen.getByRole('form',{name:'Property profile'})).toHaveClass('product-form');
+  expect(screen.getByRole('form',{name:'Create sale listing'}).querySelector('.form-grid')).toBeInTheDocument();
+  expect(screen.getByLabelText('Description').tagName).toBe('TEXTAREA');
+  expect(screen.getByLabelText('Private postal address').tagName).toBe('TEXTAREA');
+  expect(screen.getByLabelText('Approximate public locality')).toHaveAttribute('aria-describedby','property-locality-help');
+  expect(container.textContent).not.toMatch(/[ÂÃâ]/);
+});
+it('submits public listing fields and the separate private address for moderation',async()=>{
+  vi.spyOn(propertiesApi,'mine').mockResolvedValue([]);
+  vi.spyOn(propertiesApi,'profile').mockResolvedValue({display_name:'Owner',capacity:'OWNER',share_contact:false});
+  const create=vi.spyOn(propertiesApi,'create').mockResolvedValue({} as never);
+  render(<MemoryRouter><PropertyManagePage/></MemoryRouter>);
+  await screen.findByLabelText('Title');
+  for(const [label,value] of [['Title','Sale home'],['Description','A quiet home'],['Price (₹)','100'],['Approximate public locality','Pune'],['Private postal address','123 Private Lane']]){
+    await userEvent.type(screen.getByLabelText(label),value);
+  }
+  await userEvent.click(screen.getByRole('button',{name:'Submit for moderation'}));
+  await waitFor(()=>expect(create).toHaveBeenCalledWith({title:'Sale home',description:'A quiet home',category:'Residential',price:'100',locality:'Pune',private_address:'123 Private Lane'}));
+  await screen.findByText('Saved.');
+  expect(screen.getByLabelText('Private postal address')).toHaveValue('');
+});
 it('shows the saved phone-sharing preference and lets its owner withdraw it',async()=>{
   vi.spyOn(propertiesApi,'mine').mockResolvedValue([]);
   let saved:PropertyProfile={display_name:'Owner',capacity:'OWNER',share_contact:true};

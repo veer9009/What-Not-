@@ -42,6 +42,8 @@ def test_inactive_and_admin_cannot_set_dispatch(auth_client, records, db):
     headers = bearer(user.id)
     user.role = 'ADMIN'
     db.flush()
+    assert auth_client.patch(PATH, json=POINT, headers=headers).status_code == 401
+    headers = bearer(user.id)
     assert auth_client.patch(PATH, json=POINT, headers=headers).status_code == 403
     user.role = 'SELLER'
     user.is_active = False

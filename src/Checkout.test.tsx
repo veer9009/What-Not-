@@ -34,7 +34,7 @@ function setup(products = [first], handler?: (call: Call) => Reply | Promise<Rep
   setAccessToken('checkout-test');
   const calls: Call[] = [];
   vi.stubGlobal('fetch', async (input: string, options: RequestInit) => {
-    const path = new URL(input).pathname.replace('/api/v1', '');
+    const path = new URL(input, location.origin).pathname.replace('/api/v1', '');
     const body = options.body ? JSON.parse(String(options.body)) : undefined;
     const key = new Headers(options.headers).get('Idempotency-Key');
     calls.push({ path, body, key });

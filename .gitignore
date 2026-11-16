@@ -7,6 +7,7 @@ vite.config.js
 vite.config.d.ts
 package-lock.json
 backend/.venv/
+backend/.private-product-images/
 __pycache__/
 .pytest_cache/
 *.pyc
@@ -21,3 +22,8 @@ backend/.env
 **/.env.*
 !**/.env.example
 !**/.env.*.example
+
+# Local verification reports (do not commit)
+/local-*.json
+/product-image-frontend-*.json
+/docs/security/evidence/

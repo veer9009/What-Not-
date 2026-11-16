@@ -5,13 +5,11 @@ from typing import Annotated, ClassVar
 
 from pydantic import EmailStr, Field, SecretStr, UUID4, field_validator, model_validator
 
-from app.schemas.common import ContractModel, DatabaseId, Name
+from app.schemas.common import ContractModel, DatabaseId, Name, Latitude, Longitude
 from app.schemas.order import OrderCreate
 from app.schemas.user import UserRole
 
 Phone = Annotated[str, Field(min_length=1, max_length=32)]
-Latitude = Annotated[Decimal, Field(ge=-90, le=90, decimal_places=6, allow_inf_nan=False)]
-Longitude = Annotated[Decimal, Field(ge=-180, le=180, decimal_places=6, allow_inf_nan=False)]
 StrictBool = Annotated[bool, Field(strict=True)]
 
 

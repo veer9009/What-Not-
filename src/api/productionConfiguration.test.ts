@@ -18,10 +18,10 @@ it.each(['/auth/register', '/auth/login', '/auth/me', '/orders', '/discovery/pro
     expect(fetcher.mock.calls[0][0]).toBe(`/api/v1${path}`);
   });
 
-it('preserves the Windows loopback development default', async () => {
+it('uses the same-origin development proxy for cookie authentication', async () => {
   const fetcher = configured(false);
   await api('/auth/login', { auth: false });
-  expect(fetcher.mock.calls[0][0]).toBe('http://127.0.0.1:8000/api/v1/auth/login');
+  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/auth/login');
 });
 
 it.each(['/api/v1', '/api/v1/'])('accepts the exact same-origin prefix %s', async base => {

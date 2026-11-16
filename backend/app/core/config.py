@@ -17,6 +17,28 @@ class Settings(BaseSettings):
         hide_input_in_errors=True,
     )
     environment: Literal["development", "test", "production"] = "development"
+    image_storage: Literal['local', 's3'] = 'local'
+    image_local_directory: Path = Path(__file__).resolve().parents[2] / '.private-product-images'
+    image_s3_bucket: str | None = None
+    image_s3_region: str | None = None
+    image_delivery_origin: str = 'http://127.0.0.1:8000'
+    image_url_ttl_seconds: int = Field(default=900, ge=60, le=3600)
+    image_upload_hourly_limit: int = Field(default=30, ge=1, le=200)
+
+    @model_validator(mode='after')
+    def image_configuration(self):
+        origin = urlsplit(self.image_delivery_origin)
+        if (origin.scheme not in {'http', 'https'} or not origin.hostname or origin.path not in {'', '/'}
+                or origin.username or origin.password or origin.query or origin.fragment):
+            raise ValueError('Image delivery requires an explicit HTTP(S) origin')
+        origin.port
+        self.image_delivery_origin = self.image_delivery_origin.rstrip('/')
+        if self.image_storage == 's3':
+            if not self.image_s3_bucket or not re.fullmatch(r'[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]', self.image_s3_bucket):
+                raise ValueError('S3 image storage requires a bucket name')
+            if self.environment == 'production' and origin.scheme != 'https':
+                raise ValueError('Production image delivery requires HTTPS')
+        return self
     jwt_secret_key: SecretStr | None = None
     jwt_algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = Field(default=15, ge=1, le=60)

@@ -50,8 +50,11 @@ def test_openapi_exposes_contracts_and_documents_placeholders(client):
             elif (path, method) in {('/api/v1/health','get'),('/api/v1/ready','get'),
                     ('/api/v1/properties','get'),('/api/v1/properties/{id}','get'),
                     ('/api/v1/creative/listings','get'),('/api/v1/auth/register','post'),
-                    ('/api/v1/auth/login','post')}:
+                    ('/api/v1/auth/login','post'), ('/api/v1/auth/refresh','post'),
+                    ('/api/v1/auth/logout','post')}:
                 assert not operation.get('security')
+            elif (path, method) == ('/api/v1/product-images/{key}', 'get'):
+                assert operation['security'] == [{'APIKeyQuery': []}]
             else:
                 assert operation['security'] == [{'HTTPBearer': []}]
 

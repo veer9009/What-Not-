@@ -15,6 +15,7 @@ import { ordersApi } from '../api/orders';
 import { ApiError, getAccessToken } from '../api/client';
 import type { Address, Order } from '../api/types';
 import type { PlacementAttempt } from '../types';
+import '../styles/buyer-checkout.css';
 
 function placementError(reason: unknown) {
   if (reason instanceof ApiError && reason.code === 'CHECKOUT_RECOVERY_UNAVAILABLE')
@@ -129,10 +130,10 @@ export function CartPage() {
     </div>)}<Link className="text-link" to="/buyer/orders">View buyer orders</Link></section>}
     {uncertain && !results.some(result => result.error) && <p className="form-error" role="alert">An earlier order outcome is unconfirmed. Reconcile it using the original request or <Link to="/buyer/orders">check your order history</Link>.</p>}
     {canReconcile && !state.cart.length && <section className="panel"><button className="btn btn-primary" disabled={busy} onClick={()=>void placeOrders()}>{busy?'Placing orders…':'Reconcile orders'}</button></section>}
-    {state.cart.length ? groups.length ? <div className="cart-layout"><div className="cart-list">
+    {state.cart.length ? groups.length ? <div className="cart-layout buyer-cart"><div className="cart-list">
       <p className="approval-help">{groups.length} separate seller {groups.length === 1 ? 'order' : 'orders'}. Delivery is Free (₹0). {hasSamples&&'Sample items are illustrative and will not be ordered.'}</p>
       {groups.map(group => <section className="seller-order-group" key={group.sellerId ? `backend:${group.sellerId}` : `sample:${group.seller}`}><h2>{group.seller}{!group.sellerId&&' · Sample, not orderable'}</h2>{group.items.map(({ product, quantity }) => <article className="cart-item" key={product.id}>
-        {product.image?<img referrerPolicy="no-referrer" src={product.image} alt={product.name}/>:<span aria-hidden="true"/>}<div><p className="eyebrow">{product.seller}</p><h3>{product.name}</h3><span>{product.backend?'Nearby locality':`${product.distance} km away`}</span></div>
+        {product.image?<img referrerPolicy="no-referrer" src={product.image} alt={product.name}/>:<span className="cart-image-placeholder" aria-hidden="true"/>}<div className="cart-product-copy"><p className="eyebrow">{product.seller}</p><h3>{product.name}</h3><span>{product.backend?'Nearby locality':`${product.distance} km away`}</span></div>
         <div className="quantity"><button aria-label={`Decrease ${product.name} quantity`} disabled={busy || state.cart.some(item => item.productId === product.id && item.placementUncertain) || quantity <= 1} onClick={() => dispatch({ type: 'cart/quantity', id: product.id, quantity: quantity - 1 })}><Minus/></button><b>{quantity}</b><button aria-label={`Increase ${product.name} quantity`} disabled={busy || state.cart.some(item => item.productId === product.id && item.placementUncertain) || quantity >= product.stock} onClick={() => dispatch({ type: 'cart/quantity', id: product.id, quantity: quantity + 1 })}><Plus/></button></div>
         <strong>₹{(product.price * quantity).toLocaleString('en-IN')}</strong><button className="trash" aria-label={`Remove ${product.name}`} disabled={busy || state.cart.some(item => item.productId === product.id && item.placementUncertain)} onClick={() => dispatch({ type: 'cart/remove', id: product.id })}><Trash2/></button>
       </article>)}<p className="seller-order-total">Seller subtotal ₹{group.subtotal.toLocaleString('en-IN')} + delivery Free (₹0) = ₹{group.total.toLocaleString('en-IN')}</p></section>)}
@@ -151,7 +152,7 @@ function SavedDeliveryAddress({ busy, value, change, loaded }: { busy: boolean; 
   useEffect(() => { loaded(resource.data ?? []); }, [resource.data, loaded]);
   if (resource.loading) return <Loading/>;
   if (resource.error) return <ErrorNotice message={resource.error} retry={()=>void resource.reload()}/>;
-  return <><label className="field"><span>Delivery address</span><select aria-label="Delivery address" value={value} disabled={busy} onChange={event=>change(event.target.value)}>
+  return <section className="checkout-address" aria-label="Choose delivery address"><label className="field"><span>Delivery address</span><select aria-label="Delivery address" value={value} disabled={busy} onChange={event=>change(event.target.value)}>
     <option value="">Select a saved address</option>{resource.data?.map(address=><option key={address.id} value={address.id}>{address.label} — {address.address_line1}, {address.city}, {address.state} {address.pincode}</option>)}
-  </select></label><Link className="text-link" to="/buyer/addresses">Manage saved addresses</Link></>;
+  </select></label><Link className="text-link" to="/buyer/addresses">Manage saved addresses</Link><p className="approval-help">After placing an order, open its details to review and optionally confirm the saved delivery point for the assigned seller's navigation. Precise coordinates are shared only after your confirmation.</p></section>;
 }

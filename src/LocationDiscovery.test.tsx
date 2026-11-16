@@ -11,7 +11,7 @@ type Reply = [number, unknown];
 function setup(handler:(path:string,body:any)=>Reply|Promise<Reply>,path='/buyer'){
   setAccessToken('location-test');
   const fetcher=vi.fn(async(input:string,options:RequestInit)=>{
-    const path=new URL(input).pathname.replace('/api/v1','');
+    const path=new URL(input, location.origin).pathname.replace('/api/v1','');
     const [status,body]=path==='/auth/me'?[200,{id:1,name:'Ravi',email:'ravi@example.com',role:'BUYER'}]:await handler(path,options.body?JSON.parse(String(options.body)):undefined);
     return new Response(JSON.stringify(body),{status});
   });vi.stubGlobal('fetch',fetcher);

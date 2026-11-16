@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.api.contracts import IdentifierPath, PLACEHOLDER_DESCRIPTION, PLACEHOLDER_RESPONSES, not_implemented
 from app.schemas.product import ProductActivation, ProductCreate, ProductResponse, ProductUpdate
@@ -15,9 +15,9 @@ async def list_products() -> list[ProductResponse]:
 
 
 @router.post("", response_model=ProductResponse, status_code=201, description='Create a PENDING product for the authenticated seller profile.')
-def create_product(payload: ProductCreate, user: Seller, session: TransactionSession):
+def create_product(payload: ProductCreate, user: Seller, session: TransactionSession, request: Request):
     profile = current_seller_profile(session, user.id)
-    return product_response(ProductService(session).create(user.id, profile.id, payload))
+    return product_response(ProductService(session, request.app.state.settings).create(user.id, profile.id, payload), request.app.state.settings)
 
 
 @router.get("/{product_id}", response_model=ProductResponse, description=PLACEHOLDER_DESCRIPTION, responses=PLACEHOLDER_RESPONSES)
@@ -26,15 +26,15 @@ async def get_product(product_id: IdentifierPath) -> ProductResponse:
 
 
 @router.patch("/{product_id}", response_model=ProductResponse, description='Edit only an owned seller product. Approved edits return to PENDING.')
-def update_product(product_id: IdentifierPath, payload: ProductUpdate, user: Seller, session: TransactionSession):
-    return product_response(ProductService(session).update(user.id, product_id, payload))
+def update_product(product_id: IdentifierPath, payload: ProductUpdate, user: Seller, session: TransactionSession, request: Request):
+    return product_response(ProductService(session, request.app.state.settings).update(user.id, product_id, payload), request.app.state.settings)
 
 
 @router.patch("/{product_id}/activation", response_model=ProductResponse, description='Activate/deactivate only an owned seller product.')
-def set_product_active(product_id: IdentifierPath, payload: ProductActivation, user: Seller, session: TransactionSession):
-    return product_response(ProductService(session).set_active(user.id, product_id, payload.is_active))
+def set_product_active(product_id: IdentifierPath, payload: ProductActivation, user: Seller, session: TransactionSession, request: Request):
+    return product_response(ProductService(session).set_active(user.id, product_id, payload.is_active), request.app.state.settings)
 
 
 @router.post("/{product_id}/resubmit", response_model=ProductResponse, description='Resubmit only an owned rejected product.')
-def resubmit_product(product_id: IdentifierPath, user: Seller, session: TransactionSession):
-    return product_response(ProductService(session).resubmit(user.id, product_id))
+def resubmit_product(product_id: IdentifierPath, user: Seller, session: TransactionSession, request: Request):
+    return product_response(ProductService(session).resubmit(user.id, product_id), request.app.state.settings)

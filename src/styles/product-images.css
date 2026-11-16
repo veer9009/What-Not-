@@ -1,0 +1,5 @@
+.product-image-previews{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:1rem;margin-top:1rem}
+.product-image-previews figure{margin:0;display:flex;flex-direction:column;gap:.65rem;border:1px solid var(--line);border-radius:12px;padding:1rem;min-width:0;overflow-wrap:anywhere}
+.product-image-previews img{width:100%;height:160px;object-fit:cover;border-radius:8px}
+.product-image-previews figcaption{font-size:.85rem;font-weight:600}
+.product-image-previews input,.product-image-previews progress{max-width:100%}
