@@ -4,6 +4,14 @@ import { ApiError, api, setAccessToken, getAccessToken, onUnauthorized } from '.
 afterEach(() => { setAccessToken(null); vi.unstubAllGlobals(); });
 function response(body: string, status = 200) { return new Response(body, { status, headers: { 'Content-Type': 'application/json' } }); }
 describe('HTTP client', () => {
+  it.each(['/auth/register', '/auth/login', '/auth/refresh', '/auth/me'])('explains controlled beta admission denial for %s', async path => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response('{"detail":"This account is not admitted to the controlled beta"}', 403)));
+    await expect(api(path, { auth: false })).rejects.toThrow(/approved beta email.*contact.*beta organizer/i);
+  });
+  it('does not turn unrelated permission errors into beta admission denials', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response('{"detail":"Operation is not permitted for this role"}', 403)));
+    await expect(api('/auth/me')).rejects.toThrow('You do not have permission to perform this operation.');
+  });
   it('sends JSON and bearer credentials without actor IDs', async () => {
     setAccessToken('test-credential'); const fetcher = vi.fn().mockResolvedValue(response('{"id":1}')); vi.stubGlobal('fetch', fetcher);
     expect(await api('/products', { method: 'POST', body: { name: 'Candle' } })).toEqual({ id: '1' });

@@ -143,7 +143,13 @@ export async function api<T>(path: string, { method = 'GET', body, bodyText, aut
     }
     const code = response.status === 409 && data && typeof data === 'object' && 'code' in data
       && (data.code === 'DELIVERY_INELIGIBLE' || data.code === 'IDEMPOTENCY_CONFLICT') ? data.code : undefined;
-    throw new ApiError(response.status, messages[response.status] || 'The marketplace service is unavailable. Please try again later.', fields, code);
+    // Recognize only this public denial; never render arbitrary server details.
+    const betaDenied = response.status === 403 && /^\/auth\/(register|login|refresh|me)$/.test(path)
+      && data && typeof data === 'object' && 'detail' in data
+      && data.detail === 'This account is not admitted to the controlled beta';
+    throw new ApiError(response.status, betaDenied
+      ? 'Use an approved beta email address or contact the beta organizer for access.'
+      : messages[response.status] || 'The marketplace service is unavailable. Please try again later.', fields, code);
   }
   return data as T;
 }
