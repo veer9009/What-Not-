@@ -9,6 +9,7 @@ from app.models.order_item import OrderItem
 from app.models.events import AuditEvent, Notification, EmailOutbox
 from app.models.abuse import RequestQuota
 from app.models.auth_session import AuthSession, AuthRefreshToken
+from app.models.auth_recovery import PasswordRecovery
 from app.models.property import PropertyProfile, PropertyListing, PropertyEnquiry, PropertyVisit, SavedProperty, PropertyReport
 from app.models.creative import CreativeProvider, CreativeListing, CreativeRFQ, CreativeResponse, CreativeEngagement, CreativeReview
 

@@ -4,6 +4,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../state/AuthContext';
 import type { Product, ProductStatus } from '../types';
 import { supportUrl } from '../utils/support';
+import { ListingImage } from './ListingImage';
 
 export function Logo({ light = false }: { light?: boolean }) {
   return <Link className={`logo ${light ? 'logo-light' : ''}`} to="/"><span className="logo-mark">N</span><span>What Not?<small>discover local possibilities</small></span></Link>;
@@ -17,7 +18,7 @@ export function PublicHeader() {
 export function Rating({ value }: { value:number }) { return <span className="rating"><Star size={14} fill="currentColor" aria-hidden="true"/> Sample rating: {value}</span>; }
 export function StatusBadge({ status }: { status:ProductStatus | 'INACTIVE' | 'OUT_OF_STOCK' }) { const labels = { PENDING:'Pending', APPROVED:'Approved', REJECTED:'Rejected', INACTIVE:'Inactive', OUT_OF_STOCK:'Out of Stock' }; return <span className={`status ${status.toLowerCase()}`}>{labels[status]}</span>; }
 export function ProductCard({ product }: { product:Product }) {
-  return <article className="product-card"><div className="product-image"><img referrerPolicy="no-referrer" src={product.image} alt={product.name}/><span className="sample-product-label">Sample</span><span className="distance"><MapPin size={13}/>{product.distance} km</span></div><div className="product-body"><div className="product-meta"><span>{product.category}</span><Rating value={product.rating}/></div><h3>{product.name}</h3><p className="seller-line">{product.seller}</p><div className="price-row"><strong>₹{product.price.toLocaleString('en-IN')}</strong><Link className="text-link" to={`/buyer/samples/products/${product.id}`}>View product →</Link></div></div></article>;
+  return <article className="product-card"><div className="product-image"><ListingImage src={product.image} alt={product.name}/><span className="sample-product-label">Sample</span><span className="distance"><MapPin size={13}/>{product.distance} km</span></div><div className="product-body"><div className="product-meta"><span>{product.category}</span><Rating value={product.rating}/></div><h3>{product.name}</h3><p className="seller-line">{product.seller}</p><div className="price-row"><strong>₹{product.price.toLocaleString('en-IN')}</strong><Link className="text-link" to={`/buyer/samples/products/${product.id}`}>View product →</Link></div></div></article>;
 }
 export function RadiusSelector({ value,onChange,label='Distance radius' }: { value:number;onChange:(n:1|2|3)=>void;label?:string }) { return <div className="radius-select" role="group" aria-label={label}>{([1,2,3] as const).map(n=><button type="button" className={value===n?'active':''} aria-pressed={value===n} key={n} onClick={()=>onChange(n)}>{n} KM</button>)}</div>; }
 export function RadiusVisual() { return <div className="radius-visual"><span className="ring ring-3"><b>3 KM</b></span><span className="ring ring-2"><b>2 KM</b></span><span className="ring ring-1"><b>1 KM</b></span><span className="maker-pin">🏺<small>Local maker</small></span><span className="buyer-dot one">●<small>0.8 km</small></span><span className="buyer-dot two">●<small>1.7 km</small></span><span className="buyer-dot three">●<small>2.7 km</small></span></div>; }

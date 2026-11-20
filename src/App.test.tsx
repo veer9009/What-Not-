@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,15 +19,25 @@ export function mockApi(handler: (path: string, method: string, body: any) => [n
 export function open(path: string) { return render(<MemoryRouter initialEntries={[path]}><App/></MemoryRouter>); }
 afterEach(() => { setAccessToken(null); vi.unstubAllGlobals(); });
 describe('authenticated marketplace routes', () => {
-  it('offers only Buyer and Seller on the public login selection', () => {
+  it.each(['SUPERUSER','BUYER,SELLER'])('rejects an unrecognized server account role: %s',async role=>{
+    mockApi(path=>path==='/auth/login'?[200,{access_token:'test-token',expires_in:900,token_type:'bearer',user:account('BUYER')}]:[200,account(role)]);
     open('/login');
-    expect(screen.getByRole('heading', { name: 'Buyer' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Seller' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Continue as buyer/i })).toHaveAttribute('href', '/login/buyer');
-    expect(screen.getByRole('link', { name: /Continue as seller/i })).toHaveAttribute('href', '/login/seller');
+    fireEvent.change(screen.getByLabelText('Email address'),{target:{value:'ravi@example.test'}});
+    fireEvent.change(screen.getByLabelText('Password'),{target:{value:'test-password'}});
+    await userEvent.click(screen.getByRole('button',{name:'Sign in'}));
+    expect(await screen.findByRole('alert')).toHaveTextContent('invalid account');
+    expect(screen.getByRole('heading',{name:'Welcome back'})).toBeInTheDocument();
+    expect(getAccessToken()).toBeNull();
+  });
+  it('offers unified public sign-in with account creation and recovery', () => {
+    open('/login');
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Email address')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/forgot-password');
+    expect(screen.getByRole('link', { name: 'Become a seller' })).toHaveAttribute('href', '/register?role=seller');
     expect(screen.queryByRole('heading', { name: 'Admin' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /admin/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Create a buyer or seller account' })).toHaveAttribute('href', '/register');
+    expect(screen.getByRole('link', { name: 'Create account' })).toHaveAttribute('href', '/register');
   });
   it.each(['/admin/login', '/login/admin', '/admin', '/admin/addresses'])('renders separate admin sign-in at %s without fetching protected records', async path => {
     const fetcher = mockApi(() => [500, {}]);

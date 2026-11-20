@@ -62,10 +62,19 @@ export function logoutSession() {
   setAccessToken(null); channel?.postMessage('logout');
   return serialized(() => api<void>('/auth/logout', { method: 'POST', auth: false }));
 }
+export function resetPasswordSession(reset_token: string, password: string, signal?: AbortSignal) {
+  return serialized(async () => {
+    const result = await api<{ message: string }>('/auth/password-recovery/reset', {
+      method: 'POST', body: { reset_token, password }, auth: false, signal,
+    });
+    invalidate(); channel?.postMessage('logout');
+    return result;
+  });
+}
 export function getAccessToken() { return credential; }
 export function onUnauthorized(listener: () => void) { unauthorizedListeners.add(listener); return () => { unauthorizedListeners.delete(listener); }; }
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public fields: Record<string,string> = {}, public code?: string) { super(message); this.name = 'ApiError'; }
+  constructor(public status: number, message: string, public fields: Record<string,string> = {}, public code?: string, public retryAfter?: number) { super(message); this.name = 'ApiError'; }
 }
 const messages: Record<number,string> = {
   401: 'Your session expired or your credentials are invalid. Please sign in again.',
@@ -110,7 +119,7 @@ export async function api<T>(path: string, { method = 'GET', body, bodyText, aut
   const started = generation;
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
-  const cookieAuth = /^\/auth\/(login|refresh|logout)$/.test(path);
+  const cookieAuth = /^\/auth\/(login|refresh|logout|password-recovery\/(request|verify|reset))$/.test(path);
   if (cookieAuth) headers.set('X-WhatNot-CSRF', '1');
   let response: Response;
   let raw: string;
@@ -147,9 +156,14 @@ export async function api<T>(path: string, { method = 'GET', body, bodyText, aut
     const betaDenied = response.status === 403 && /^\/auth\/(register|login|refresh|me)$/.test(path)
       && data && typeof data === 'object' && 'detail' in data
       && data.detail === 'This account is not admitted to the controlled beta';
-    throw new ApiError(response.status, betaDenied
+    const recoveryInvalid = response.status === 400 && /^\/auth\/password-recovery\/(verify|reset)$/.test(path);
+    const retryHeader = response.headers.get('Retry-After');
+    const retryAfter = retryHeader && /^\d{1,4}$/.test(retryHeader) && Number(retryHeader) >= 1 && Number(retryHeader) <= 3600 ? Number(retryHeader) : undefined;
+    throw new ApiError(response.status, recoveryInvalid
+      ? 'This code or recovery request is invalid or expired. Request a new code and try again.'
+      : betaDenied
       ? 'Use an approved beta email address or contact the beta organizer for access.'
-      : messages[response.status] || 'The marketplace service is unavailable. Please try again later.', fields, code);
+      : messages[response.status] || 'The marketplace service is unavailable. Please try again later.', fields, code, retryAfter);
   }
   return data as T;
 }

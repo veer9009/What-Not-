@@ -1,3 +1,4 @@
+import { ListingImage } from '../components/ListingImage';
 import { CollectionNotice } from '../components/LegalNavigation';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -133,7 +134,7 @@ export function CartPage() {
     {state.cart.length ? groups.length ? <div className="cart-layout buyer-cart"><div className="cart-list">
       <p className="approval-help">{groups.length} separate seller {groups.length === 1 ? 'order' : 'orders'}. Delivery is Free (₹0). {hasSamples&&'Sample items are illustrative and will not be ordered.'}</p>
       {groups.map(group => <section className="seller-order-group" key={group.sellerId ? `backend:${group.sellerId}` : `sample:${group.seller}`}><h2>{group.seller}{!group.sellerId&&' · Sample, not orderable'}</h2>{group.items.map(({ product, quantity }) => <article className="cart-item" key={product.id}>
-        {product.image?<img referrerPolicy="no-referrer" src={product.image} alt={product.name}/>:<span className="cart-image-placeholder" aria-hidden="true"/>}<div className="cart-product-copy"><p className="eyebrow">{product.seller}</p><h3>{product.name}</h3><span>{product.backend?'Nearby locality':`${product.distance} km away`}</span></div>
+        <div className="cart-image-placeholder"><ListingImage src={product.image} alt={product.name}/></div><div className="cart-product-copy"><p className="eyebrow">{product.seller}</p><h3>{product.name}</h3><span>{product.backend?'Nearby locality':`${product.distance} km away`}</span></div>
         <div className="quantity"><button aria-label={`Decrease ${product.name} quantity`} disabled={busy || state.cart.some(item => item.productId === product.id && item.placementUncertain) || quantity <= 1} onClick={() => dispatch({ type: 'cart/quantity', id: product.id, quantity: quantity - 1 })}><Minus/></button><b>{quantity}</b><button aria-label={`Increase ${product.name} quantity`} disabled={busy || state.cart.some(item => item.productId === product.id && item.placementUncertain) || quantity >= product.stock} onClick={() => dispatch({ type: 'cart/quantity', id: product.id, quantity: quantity + 1 })}><Plus/></button></div>
         <strong>₹{(product.price * quantity).toLocaleString('en-IN')}</strong><button className="trash" aria-label={`Remove ${product.name}`} disabled={busy || state.cart.some(item => item.productId === product.id && item.placementUncertain)} onClick={() => dispatch({ type: 'cart/remove', id: product.id })}><Trash2/></button>
       </article>)}<p className="seller-order-total">Seller subtotal ₹{group.subtotal.toLocaleString('en-IN')} + delivery Free (₹0) = ₹{group.total.toLocaleString('en-IN')}</p></section>)}

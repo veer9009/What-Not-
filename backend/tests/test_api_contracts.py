@@ -51,7 +51,10 @@ def test_openapi_exposes_contracts_and_documents_placeholders(client):
                     ('/api/v1/properties','get'),('/api/v1/properties/{id}','get'),
                     ('/api/v1/creative/listings','get'),('/api/v1/auth/register','post'),
                     ('/api/v1/auth/login','post'), ('/api/v1/auth/refresh','post'),
-                    ('/api/v1/auth/logout','post')}:
+                    ('/api/v1/auth/logout','post'),
+                    ('/api/v1/auth/password-recovery/request','post'),
+                    ('/api/v1/auth/password-recovery/verify','post'),
+                    ('/api/v1/auth/password-recovery/reset','post')}:
                 assert not operation.get('security')
             elif (path, method) == ('/api/v1/product-images/{key}', 'get'):
                 assert operation['security'] == [{'APIKeyQuery': []}]

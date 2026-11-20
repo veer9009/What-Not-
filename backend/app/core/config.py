@@ -40,6 +40,7 @@ class Settings(BaseSettings):
                 raise ValueError('Production image delivery requires HTTPS')
         return self
     jwt_secret_key: SecretStr | None = None
+    password_recovery_key: SecretStr | None = None
     jwt_algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = Field(default=15, ge=1, le=60)
     delivery_confirmation_grace_hours: int = Field(default=24, ge=1, le=168)
@@ -89,7 +90,7 @@ class Settings(BaseSettings):
             raise ValueError('Outbox lease must exceed provider timeout')
         return self
 
-    @field_validator("jwt_secret_key")
+    @field_validator("jwt_secret_key", "password_recovery_key")
     @classmethod
     def strong_signing_key(cls, value):
         if value is not None:

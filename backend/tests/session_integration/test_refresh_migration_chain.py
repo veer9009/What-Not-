@@ -30,5 +30,13 @@ def test_current_head_upgrade_and_empty_downgrade(session_engine):
         assert connection.scalar(text('SELECT count(*) FROM orders')) == 0
         connection.commit()
         command.upgrade(config, 'head')
+        assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0011'
+        assert 'password_recoveries' in inspect(connection).get_table_names()
+        connection.commit()
+        command.downgrade(config, '0010')
+        assert 'password_recoveries' not in inspect(connection).get_table_names()
         assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0010'
+        connection.commit()
+        command.upgrade(config, 'head')
+        assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0011'
         connection.commit()

@@ -212,3 +212,94 @@ frontend integration.
 
 Library references: [argon2-cffi parameters](https://argon2-cffi.readthedocs.io/en/stable/parameters.html)
 and [PyJWT usage](https://pyjwt.readthedocs.io/en/latest/usage.html).
+# Email password recovery
+
+The three same-origin CSRF-protected POST endpoints are
+`/api/v1/auth/password-recovery/request` (`email`), `/verify` (`challenge`, `otp`),
+and `/reset` (`reset_token`, `password`). Requests return HTTP 202 with a generic
+message, opaque `challenge` and `resend_after: 60`, including unknown, inactive,
+non-admitted and rate-limited accounts. Verify returns a reset token or generic
+HTTP 400; reset returns `Password updated. Sign in again.` or generic HTTP 400.
+All responses use no-store. Password whitespace is preserved.
+
+Live recovery is deliberately disabled in every environment until durable email
+delivery has an approved implementation. All three endpoints return generic 503
+before quota or recovery queries, even if SMTP and a recovery key are configured.
+Only a `FakeMailProvider` injected into a `test` application enables synthetic
+tests; this adapter never sends email. There is no flag to enable transient SMTP.
+
+An operator must separately review additive migration `0011` before any future
+activation. No migration runs automatically. A future activation requires
+`WHAT_NOT_PASSWORD_RECOVERY_KEY` through a
+secret manager to a securely generated secret of at least 32 bytes. Missing keys
+fail closed with HTTP 503. Do not reuse the JWT signing key. Rotating this key
+invalidates outstanding recovery credentials. Configure the existing
+`WHAT_NOT_EMAIL_PROVIDER=smtp`, SMTP host, sender, TLS and authentication secrets
+for actual delivery only after the durable-delivery blocker is resolved. Existing
+SMTP settings do not enable password recovery. Never put operational secrets in committed env files.
+
+Codes use six cryptographically random digits, expire after five minutes and
+permit at most five attempts. Resend delivery is suppressed for sixty seconds.
+Issuing an eligible replacement retires all older OTP challenges and verified
+reset proofs atomically under the user lock. Cooldown and quota suppressed
+requests leave the current usable credential intact. Concurrent resends issue
+at most one usable replacement; verification and reset use the same lock order.
+The database stores keyed HMAC digests of codes and password state, never code
+plaintext. Reset tokens contain 256 random bits, are stored as keyed digests,
+expire after five minutes and can be used once. A password change invalidates
+outstanding recovery state. Reset locks the user before recovery/session rows,
+updates the Argon2 password and revokes every authentication session atomically.
+Existing bearer access tokens consequently cease to authenticate.
+
+Recovery quotas are PostgreSQL atomic counters committed independently of the
+business transaction: thirty operations per source per endpoint per fifteen
+minutes and five recovery requests per normalized email per fifteen minutes.
+They remain enabled in test mode and when general abuse controls are disabled.
+Failed verification attempts commit despite their HTTP 400 response.
+
+The previous post-commit Starlette background task was **not durable**: a restart
+after commit lost the only OTP payload; SMTP failures were logged without retry.
+A later resend could leave a stale task sending an obsolete code. Supersession
+now prevents that old code authenticating, but cannot make delivery reliable.
+Only synthetic fake delivery still uses this background path. Delivery failures
+log a fixed event name. Events exclude emails, codes, passwords, reset tokens and
+mail exception text.
+
+### Operator decision required: durable delivery
+
+The existing database email outbox has plaintext notification title/body fields;
+placing recovery messages there would persist OTP plaintext and violate recovery
+storage guarantees. HMAC digests alone cannot reconstruct an email after restart.
+A suitable beta design can reuse PostgreSQL and the existing worker lifecycle,
+but requires separately approved authenticated encryption for a short-lived OTP
+payload, a separate managed encryption key (not JWT/HMAC key), atomic enqueue with
+challenge issuance, leases and bounded retries, and expiry/supersession checks
+before sending. Define key rotation, encrypted-payload erasure, worker supervision
+and the unavoidable SMTP send/ack duplicate window. Do not add Redis or Celery
+merely for this workflow. No new worker, queue, encryption dependency, key or schema
+was added in this review. Keep live recovery disabled until that design is approved,
+implemented and tested with synthetic mail; configuring SMTP alone is insufficient.
+
+### Migration review and rollback
+
+`0011` correctly follows `0010` (refresh sessions) and adds only
+`password_recoveries`, its foreign key, unique reset digest and lookup/expiry
+indexes. PostgreSQL BIGINT/TIMESTAMPTZ types match the existing users and UTC-aware
+credential lifecycle. It does not update existing user or authentication rows.
+Application writes constrain attempt counts and timestamps; no new migration was
+needed for supersession. Review the intended database identity, schema/search_path,
+ownership and current revision `0010` before an operator applies this migration.
+The review exercised offline PostgreSQL DDL compilation only, never Alembic against
+a database. Integration tests use ORM metadata in a guarded disposable schema.
+
+Before any operator migration, take an encrypted full-database backup (schema,
+data and revision metadata), record its checksum and access controls, and rehearse
+restoration into a separate disposable database. Stop writes or establish a
+documented consistent snapshot and recovery point; retain a tested matching app
+build. Verify row counts, foreign keys and authentication after restoration.
+If the additive upgrade fails, inspect its transaction result before retrying.
+Prefer rolling back the app while retaining the additive table. Downgrade refuses
+nonempty recovery history deliberately: never delete records to force it. Any
+database restoration requires a separate operator decision about lost writes,
+maintenance mode and session invalidation. No backup, restore or migration was
+performed as part of this review.

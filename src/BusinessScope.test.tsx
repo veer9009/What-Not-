@@ -30,7 +30,7 @@ describe('What Not? business scope', () => {
       ['Real Estate', 'Discover local properties available for sale.'],
       ['Creative Services', 'Find video editors, VFX artists and creative professionals.'],
     ]) {
-      expect(within(explore).getByRole('heading', { name })).toBeInTheDocument();
+      expect(within(explore).getByRole('heading', { name: path === '/' && name === 'Homemade' ? 'Homemade Products' : name })).toBeInTheDocument();
       expect(within(explore).getByText(description)).toBeInTheDocument();
     }
     expect(within(explore).getByRole('link', { name: path === '/buyer' ? 'Explore nearby Homemade' : 'Explore Homemade samples' })).toHaveAttribute('href', path === '/buyer' ? '/buyer#homemade-catalogue' : '/buyer/samples#homemade-catalogue');

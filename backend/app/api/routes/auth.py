@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.api.dependencies import CurrentUser, TransactionSession
@@ -114,3 +114,50 @@ def logout(request: Request, session: TransactionSession):
 def me(user: CurrentUser, response: Response):
     response.headers['Cache-Control'] = 'no-store'
     return user_response(user)
+
+
+from app.schemas.auth_recovery import RecoveryRequest, RecoveryVerify, RecoveryReset
+from app.services.auth_recovery import (PasswordRecoveryService, recovery_ready, recovery_limit,
+                                        deliver_recovery, GENERIC_MESSAGE, INVALID)
+
+
+def require_password_recovery(request: Request):
+    recovery_ready(request.app.state.settings, getattr(request.app.state, 'recovery_mail_provider', None))
+
+
+@router.post('/password-recovery/request', status_code=202,
+             dependencies=[Depends(require_auth_csrf), Depends(require_password_recovery)])
+def request_password_recovery(payload: RecoveryRequest, request: Request,
+                              background: BackgroundTasks, session: TransactionSession):
+    settings = request.app.state.settings
+    source = request.client.host if request.client else 'unknown'
+    allowed = recovery_limit(session, settings, 'request', source, payload.email)
+    challenge, delivery = PasswordRecoveryService(session, settings).request(payload.email, allowed=allowed)
+    # function-scoped transaction commits before Starlette executes background tasks.
+    background.add_task(deliver_recovery, settings, delivery,
+                        getattr(request.app.state, 'recovery_mail_provider', None))
+    return {'message': GENERIC_MESSAGE, 'challenge': challenge, 'resend_after': 60}
+
+
+@router.post('/password-recovery/verify', dependencies=[Depends(require_auth_csrf), Depends(require_password_recovery)])
+def verify_password_recovery(payload: RecoveryVerify, request: Request, session: TransactionSession):
+    settings = request.app.state.settings
+    source = request.client.host if request.client else 'unknown'
+    if not recovery_limit(session, settings, 'verify', source):
+        return JSONResponse({'detail': INVALID}, status_code=400)
+    raw = PasswordRecoveryService(session, settings).verify(payload.challenge, payload.otp.get_secret_value())
+    # Returning an error response commits failed attempts; raising would roll them back.
+    return {'reset_token': raw} if raw else JSONResponse({'detail': INVALID}, status_code=400)
+
+
+@router.post('/password-recovery/reset', dependencies=[Depends(require_auth_csrf), Depends(require_password_recovery)])
+def reset_password_recovery(payload: RecoveryReset, request: Request, session: TransactionSession):
+    settings = request.app.state.settings
+    source = request.client.host if request.client else 'unknown'
+    if not recovery_limit(session, settings, 'reset', source):
+        return JSONResponse({'detail': INVALID}, status_code=400)
+    if not PasswordRecoveryService(session, settings).reset(payload.reset_token.get_secret_value(), payload.password.get_secret_value()):
+        return JSONResponse({'detail': INVALID}, status_code=400)
+    response = JSONResponse({'message': 'Password updated. Sign in again.'})
+    clear_refresh_cookie(response)
+    return response
