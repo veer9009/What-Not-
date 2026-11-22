@@ -32,6 +32,21 @@ def test_recovery_downgrade_refuses_history_without_deleting_it():
     with Operations.context(context):
         revision['downgrade']()
     sql = output.getvalue()
+    # Prevent an issuer inserting history between the empty check and DROP.
+    assert sql.index('LOCK TABLE password_recoveries IN ACCESS EXCLUSIVE MODE') < sql.index('IF EXISTS')
     assert sql.index('IF EXISTS (SELECT 1 FROM password_recoveries)') < sql.index('DROP TABLE password_recoveries')
     assert 'RAISE EXCEPTION' in sql
     assert 'DELETE ' not in sql and 'TRUNCATE ' not in sql
+
+
+def test_revision_chain_has_one_head_and_no_missing_parents():
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    backend = Path(__file__).resolve().parents[1]
+    config = Config()
+    config.set_main_option('script_location', str(backend / 'alembic'))
+    scripts = ScriptDirectory.from_config(config)
+    assert scripts.get_heads() == ['0011']
+    revisions = list(scripts.walk_revisions())
+    assert [revision.revision for revision in revisions] == [f'{value:04d}' for value in range(11, 0, -1)]

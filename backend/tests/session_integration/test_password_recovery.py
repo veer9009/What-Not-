@@ -108,6 +108,24 @@ def test_wrong_attempts_are_committed_and_fifth_failure_blocks_correct_code(reco
         assert session.get(PasswordRecovery, challenge).attempts == 5
 
 
+def test_crypto_generation_and_exact_five_minute_lifetime(recovery, monkeypatch):
+    from app.services.auth_recovery import digest
+
+    bounds = []
+    def random_digit(bound):
+        bounds.append(bound)
+        return 7
+    monkeypatch.setattr('app.services.auth_recovery.secrets.randbelow', random_digit)
+    challenge, otp = requested(recovery)
+    assert bounds == [1000000] and otp == '000007'
+    assert len(challenge) == 43
+    with Session(recovery[1]) as session:
+        row = session.get(PasswordRecovery, challenge)
+        assert row.expires_at - row.created_at == timedelta(minutes=5)
+        assert row.otp_digest == digest(recovery[2], 'otp', challenge + ':' + otp)
+        assert row.attempts == 0
+
+
 def test_expired_otp_and_reset_token_are_rejected(recovery):
     client, engine, *_ = recovery
     challenge, otp = requested(recovery)

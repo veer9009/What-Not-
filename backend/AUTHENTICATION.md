@@ -299,7 +299,11 @@ documented consistent snapshot and recovery point; retain a tested matching app
 build. Verify row counts, foreign keys and authentication after restoration.
 If the additive upgrade fails, inspect its transaction result before retrying.
 Prefer rolling back the app while retaining the additive table. Downgrade refuses
-nonempty recovery history deliberately: never delete records to force it. Any
+nonempty recovery history deliberately: never delete records to force it. It takes
+an ACCESS EXCLUSIVE table lock before checking emptiness, held through DROP by
+Alembic's PostgreSQL transaction, so concurrent issuance cannot insert history
+between that check and DROP. Operators must quiesce recovery traffic before
+downgrade to avoid waiting on active transactions. Any
 database restoration requires a separate operator decision about lost writes,
 maintenance mode and session invalidation. No backup, restore or migration was
 performed as part of this review.

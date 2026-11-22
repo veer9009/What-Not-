@@ -29,6 +29,9 @@ def upgrade():
 
 
 def downgrade():
+    # Hold through the check and DROP in Alembic's PostgreSQL transaction.
+    # Otherwise concurrent issuance can insert history after the empty check.
+    op.execute('LOCK TABLE password_recoveries IN ACCESS EXCLUSIVE MODE')
     op.execute("""DO $$ BEGIN
         IF EXISTS (SELECT 1 FROM password_recoveries) THEN
             RAISE EXCEPTION 'Refusing downgrade with recovery credential history';

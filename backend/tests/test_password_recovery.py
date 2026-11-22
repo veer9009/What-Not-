@@ -23,6 +23,21 @@ def test_recovery_rejects_weak_hmac_key():
         Settings(_env_file=None, password_recovery_key='weak')
 
 
+def test_recovery_digest_is_keyed_sha256_and_domain_separated():
+    import hashlib
+    import hmac
+    from app.services.auth_recovery import digest
+
+    key = 'synthetic-hmac-test-key-' + 'x' * 40
+    config = Settings(_env_file=None, environment='test', password_recovery_key=key)
+    raw = 'synthetic-challenge:000007'
+    expected = hmac.new(key.encode(), ('otp:' + raw).encode(), hashlib.sha256).hexdigest()
+    assert digest(config, 'otp', raw) == expected
+    assert digest(config, 'reset', raw) != expected
+    other = Settings(_env_file=None, environment='test', password_recovery_key='y' * 48)
+    assert digest(other, 'otp', raw) != expected
+
+
 def test_recovery_reset_preserves_password_spaces():
     from app.schemas.auth_recovery import RecoveryReset
     assert RecoveryReset(reset_token='a' * 43, password='  new password  ').password.get_secret_value() == '  new password  '
