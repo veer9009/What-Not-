@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     smtp_timeout_seconds: int = Field(default=10, ge=1, le=30)
     email_from: str | None = None
+    beta_registration_mode: Literal['controlled', 'open'] = 'controlled'
     beta_allowed_emails: list[str] = Field(default_factory=list, repr=False)
     abuse_limits_enabled: bool = True
     discovery_hourly_limit: int = Field(default=60, ge=1, le=1000)
@@ -107,8 +108,11 @@ class Settings(BaseSettings):
             raise ValueError('Recovery SMTP requires TLS')
         if self.recovery_smtp_deadline_seconds >= self.outbox_lease_seconds:
             raise ValueError('Recovery SMTP deadline must be shorter than the lease')
-        if self.environment == 'production' and (not self.beta_allowed_emails or not self.abuse_limits_enabled):
-            raise ValueError('Production beta requires an explicit account allowlist and abuse controls')
+        if self.environment == 'production':
+            if not self.abuse_limits_enabled:
+                raise ValueError('Production beta requires abuse controls')
+            if self.beta_registration_mode == 'controlled' and not self.beta_allowed_emails:
+                raise ValueError('Controlled production beta requires an explicit account allowlist')
         if self.email_provider == 'smtp' and (not self.smtp_host or not self.email_from):
             raise ValueError('SMTP requires host and sender configuration')
         if self.email_from:
