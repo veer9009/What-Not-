@@ -65,9 +65,11 @@ def isolated_cluster():
         initialization_completed = True
         password_file.unlink()
         startup_attempted = True
+        socket_dir = root / "socket"
+        socket_dir.mkdir(mode=0o700)
         try:
             run_pg("pg_ctl", "-D", data, "-l", root / "server.log", "-w", "-t", "30",
-                   "-o", f"-h 127.0.0.1 -p {port}", "start")
+                   "-o", f"-h 127.0.0.1 -p {port} -k {socket_dir}", "start")
         except BaseException:
             log = root / "server.log"
             if log.exists():

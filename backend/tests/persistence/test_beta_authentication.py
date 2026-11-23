@@ -105,3 +105,57 @@ def test_absolute_session_expiry_blocks_refresh(admitted, db):
     assert admitted.get('/api/v1/auth/me', headers={
         'Authorization': 'Bearer ' + signed_in.json()['access_token'],
     }).status_code == 401
+
+
+@pytest.mark.parametrize('role', ['BUYER', 'SELLER'])
+def test_open_beta_registration_login_and_refresh(auth_client, role):
+    auth_client.app.state.settings = Settings(
+        _env_file=None,
+        environment='test',
+        jwt_secret_key=SECRET,
+        beta_registration_mode='open',
+        beta_allowed_emails=['invited@example.com'],
+    )
+
+    email = 'new-resident@example.com'
+
+    registered = register(auth_client, email=email, role=role)
+    assert registered.status_code == 201, registered.text
+    assert registered.json()['email'] == email
+    assert registered.json()['role'] == role
+
+    signed_in = login(auth_client, email=email)
+    assert signed_in.status_code == 200, signed_in.text
+
+    headers = {
+        'Authorization': 'Bearer ' + signed_in.json()['access_token']
+    }
+
+    assert auth_client.get(
+        '/api/v1/auth/me', headers=headers
+    ).status_code == 200
+
+    assert auth_client.post(
+        '/api/v1/auth/refresh'
+    ).status_code == 200
+
+    assert auth_client.get(
+        '/api/v1/admin/products/pending', headers=headers
+    ).status_code == 403
+
+
+def test_open_beta_rejects_admin_self_registration(auth_client):
+    auth_client.app.state.settings = Settings(
+        _env_file=None,
+        environment='test',
+        jwt_secret_key=SECRET,
+        beta_registration_mode='open',
+    )
+
+    response = register(
+        auth_client,
+        email='new-admin@example.com',
+        role='ADMIN',
+    )
+
+    assert response.status_code == 422, response.text

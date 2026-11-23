@@ -41,7 +41,7 @@ def test_dotenv_json_and_process_environment_precedence(tmp_path, monkeypatch):
 def test_production_rejects_missing_or_empty_allowlist(monkeypatch, value):
     if value is not None:
         monkeypatch.setenv('WHAT_NOT_BETA_ALLOWED_EMAILS', value)
-    with pytest.raises(ValidationError, match='explicit account allowlist and abuse controls'):
+    with pytest.raises(ValidationError, match='Controlled production beta requires an explicit account allowlist'):
         production()
 
 
@@ -53,5 +53,22 @@ def test_invalid_allowlist_format_fails_closed(monkeypatch, value):
 
 
 def test_production_rejects_disabled_abuse_with_valid_allowlist():
-    with pytest.raises(ValidationError, match='explicit account allowlist and abuse controls'):
+    with pytest.raises(ValidationError, match='Production beta requires abuse controls'):
         production(beta_allowed_emails=['buyer@example.com'], abuse_limits_enabled=False)
+
+
+def test_production_open_registration_without_allowlist():
+    settings = production(beta_registration_mode='open')
+    assert settings.beta_registration_mode == 'open'
+    assert settings.beta_allowed_emails == []
+    assert settings.abuse_limits_enabled is True
+
+
+def test_production_open_registration_rejects_disabled_abuse():
+    with pytest.raises(ValidationError, match='Production beta requires abuse controls'):
+        production(beta_registration_mode='open', abuse_limits_enabled=False)
+
+
+def test_invalid_registration_mode_rejected():
+    with pytest.raises(ValidationError):
+        production(beta_registration_mode='unrestricted')

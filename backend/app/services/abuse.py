@@ -44,5 +44,7 @@ def check_action_limit(session, settings, action, subject):
 
 
 def require_beta_admission(settings, email):
+    if settings.beta_registration_mode == 'open':
+        return
     if settings.beta_allowed_emails and email.lower() not in settings.beta_allowed_emails:
         raise HTTPException(403, 'This account is not admitted to the controlled beta')
