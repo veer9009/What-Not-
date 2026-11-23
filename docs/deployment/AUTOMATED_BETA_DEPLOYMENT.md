@@ -40,8 +40,10 @@ not decrypt credentials for a report, copy plaintext into `.env`, invent a
 loader, dump a service environment, or print credential files. Obtain reviewed
 non-secret fingerprints and references through a protected channel.
 
-Reconcile all six EC2 files against a reviewed release, including intended
-differences, hashes and provenance:
+Reconcile all six EC2 files against a reviewed release, recording hashes and
+provenance. Resolve intended differences before preflight: the release and
+rehearsal copies must be byte-identical for every listed file. Separately valid
+but unequal digests fail the reconciliation gate:
 
 - `backend/app/core/config.py`
 - `backend/app/services/abuse.py`

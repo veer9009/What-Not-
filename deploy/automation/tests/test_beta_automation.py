@@ -337,6 +337,34 @@ def test_unreconciled_ec2_files_block_before_reading_live_files(setup):
         setup.checker.reconciliation()
 
 
+@pytest.mark.parametrize('changed_file', [None, *range(6)])
+def test_reconciliation_requires_identical_release_and_ec2_files(setup, changed_file):
+    rehearsal = setup.root / 'rehearsal'
+    setup.inv['rehearsal_path'] = str(rehearsal)
+    files = {}
+    for index, name in enumerate(setup.module.RECONCILE):
+        release_file = setup.release / name
+        ec2_file = rehearsal / name
+        release_file.parent.mkdir(parents=True, exist_ok=True)
+        ec2_file.parent.mkdir(parents=True, exist_ok=True)
+        release_file.write_bytes(b'reconciled open-beta source')
+        ec2_file.write_bytes(b'EC2-only change' if index == changed_file else
+                             b'reconciled open-beta source')
+        files[name] = {
+            'release_sha256': hashlib.sha256(release_file.read_bytes()).hexdigest(),
+            'ec2_sha256': hashlib.sha256(ec2_file.read_bytes()).hexdigest(),
+        }
+    evidence(setup, 'reconciliation', {
+        'release_commit': SHA, 'status': 'PASS', 'files': files,
+        'open_beta_registration_reviewed': True, 'abuse_protection_reviewed': True,
+    })
+    if changed_file is None:
+        setup.checker.reconciliation()
+    else:
+        with pytest.raises(setup.module.Blocker):
+            setup.checker.reconciliation()
+
+
 @pytest.mark.parametrize('installed', [{'cryptography': '48.0.0'}, {}])
 def test_missing_or_wrong_pinned_dependency_blocks(setup, monkeypatch, installed):
     (setup.release / 'backend/requirements.txt').write_text('cryptography==49.0.0\n')

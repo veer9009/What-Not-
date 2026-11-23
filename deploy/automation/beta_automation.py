@@ -293,6 +293,7 @@ class Preflight:
         require(set(data['files']) == set(RECONCILE))
         for name in RECONCILE:
             record = data['files'][name]
+            require(record['release_sha256'] == record['ec2_sha256'])
             require(digest(self.root / name) == record['release_sha256'])
             require(digest(Path(self.inv['rehearsal_path']) / name) == record['ec2_sha256'])
         require(data['open_beta_registration_reviewed'] is True and data['abuse_protection_reviewed'] is True)
