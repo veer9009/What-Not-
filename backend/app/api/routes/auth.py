@@ -133,9 +133,11 @@ def request_password_recovery(payload: RecoveryRequest, request: Request,
     source = request.client.host if request.client else 'unknown'
     allowed = recovery_limit(session, settings, 'request', source, payload.email)
     challenge, delivery = PasswordRecoveryService(session, settings).request(payload.email, allowed=allowed)
-    # function-scoped transaction commits before Starlette executes background tasks.
-    background.add_task(deliver_recovery, settings, delivery,
-                        getattr(request.app.state, 'recovery_mail_provider', None))
+    # Durable mode enqueues atomically and returns no plaintext delivery tuple.
+    # Retain the old fake-only test path without enabling transient live mail.
+    if not settings.recovery_delivery_enabled:
+        background.add_task(deliver_recovery, settings, delivery,
+                            getattr(request.app.state, 'recovery_mail_provider', None))
     return {'message': GENERIC_MESSAGE, 'challenge': challenge, 'resend_after': 60}
 
 

@@ -37,7 +37,7 @@ describe('authenticated marketplace routes', () => {
     expect(screen.getByRole('link', { name: 'Become a seller' })).toHaveAttribute('href', '/register?role=seller');
     expect(screen.queryByRole('heading', { name: 'Admin' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /admin/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Create account' })).toHaveAttribute('href', '/register');
+    expect(screen.getByRole('link', { name: 'Create Buyer Account' })).toHaveAttribute('href', '/register?role=buyer');
   });
   it.each(['/admin/login', '/login/admin', '/admin', '/admin/addresses'])('renders separate admin sign-in at %s without fetching protected records', async path => {
     const fetcher = mockApi(() => [500, {}]);

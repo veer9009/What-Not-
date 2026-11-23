@@ -26,16 +26,17 @@ it.each(['/login','/login/buyer','/login/seller'])('shows a unified login at %s 
   expect(screen.getByLabelText('Email address')).toHaveAttribute('type','email');
   expect(screen.getByLabelText('Password')).toHaveAttribute('type','password');
   expect(screen.getByRole('button',{name:'Sign in'})).toBeInTheDocument();
-  expect(screen.getByRole('link',{name:'Create account'})).toHaveAttribute('href','/register');
+  expect(screen.getByRole('link',{name:'Create Buyer Account'})).toHaveAttribute('href','/register?role=buyer');
+  expect(screen.getByRole('link',{name:'Offer your services'})).toHaveAttribute('href','/register?intent=services');
   expect(screen.getByRole('link',{name:'Forgot password?'})).toHaveAttribute('href','/forgot-password');
   expect(screen.getByRole('link',{name:'Become a seller'})).toHaveAttribute('href','/register?role=seller');
   expect(within(screen.getByLabelText('Sign-in privacy notice')).getByText(/Security rate limits/)).toBeInTheDocument();
   expect(locate).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
 });
-it.each([['/register?role=seller','SELLER'],['/register?role=admin','BUYER'],['/register','BUYER']])('defaults account type safely at %s',(path,role)=>{
+it.each([['/register?role=admin','BUYER'],['/register','BUYER']])('defaults account type safely at %s',(path,role)=>{
   open(path); expect(screen.getByLabelText('Account type')).toHaveValue(role);
 });
-it.each(['/login','/login/buyer','/login/seller','/register','/register?role=seller','/forgot-password'])('uses the same original approved neighborhood without geographical artwork at %s',path=>{
+it.each(['/login','/login/buyer','/login/seller','/register','/register?role=seller','/register?role=buyer','/register?intent=services','/forgot-password'])('uses the same original approved neighborhood without geographical artwork at %s',path=>{
   open(path);
   const artwork=screen.getByTestId('login-discovery-art');
   const neighborhood=artwork.querySelector('picture img');
@@ -56,7 +57,8 @@ it.each([['/register','BUYER'],['/register?role=seller','SELLER']])('preserves r
     expect(screen.getByLabelText(label)).toBeRequired();
     fireEvent.change(screen.getByLabelText(label),{target:{value}});
   }
-  expect(screen.getByRole('combobox',{name:'Account type'})).toHaveValue(role);
+  if(role==='SELLER')expect(screen.queryByRole('combobox',{name:'Account type'})).toBeNull();
+  else expect(screen.getByRole('combobox',{name:'Account type'})).toHaveValue(role);
   expect(screen.queryByRole('option',{name:'Admin'})).toBeNull();
   fireEvent.click(screen.getByRole('button',{name:'Create account'}));
   expect(await screen.findByRole('status')).toHaveTextContent('Account created. Sign in');

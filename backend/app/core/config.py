@@ -41,6 +41,10 @@ class Settings(BaseSettings):
         return self
     jwt_secret_key: SecretStr | None = None
     password_recovery_key: SecretStr | None = None
+    recovery_delivery_enabled: bool = False
+    recovery_active_key: str | None = None
+    recovery_encryption_keys: dict[str, SecretStr] = Field(default_factory=dict, repr=False)
+    recovery_smtp_deadline_seconds: int = Field(default=10, ge=1, le=20)
     jwt_algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = Field(default=15, ge=1, le=60)
     delivery_confirmation_grace_hours: int = Field(default=24, ge=1, le=168)
@@ -77,6 +81,32 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def operational_configuration(self):
+        import base64
+        decoded = []
+        for key_id, value in self.recovery_encryption_keys.items():
+            try:
+                key = base64.b64decode(value.get_secret_value(), validate=True)
+            except Exception:
+                raise ValueError('Recovery encryption requires base64-encoded 32-byte keys') from None
+            if not re.fullmatch(r'[A-Za-z0-9_-]{1,32}', key_id) or len(key) != 32:
+                raise ValueError('Recovery encryption requires valid identifiers and 32-byte keys')
+            if any(secret and (key == secret.get_secret_value().encode()
+                               or value.get_secret_value() == secret.get_secret_value()) for secret in
+                   (self.password_recovery_key, self.jwt_secret_key)):
+                raise ValueError('Recovery encryption key must be independent')
+            decoded.append(key)
+        if len(decoded) != len(set(decoded)):
+            raise ValueError('Recovery key versions must use distinct key material')
+        if self.recovery_active_key is not None and self.recovery_active_key not in self.recovery_encryption_keys:
+            raise ValueError('Recovery active encryption key is missing')
+        if self.recovery_delivery_enabled and (not self.recovery_active_key or not self.password_recovery_key):
+            raise ValueError('Recovery activation requires encryption and HMAC keys')
+        if self.recovery_delivery_enabled and self.email_provider != 'smtp' and self.environment != 'test':
+            raise ValueError('Recovery activation requires SMTP')
+        if self.recovery_delivery_enabled and not self.smtp_starttls:
+            raise ValueError('Recovery SMTP requires TLS')
+        if self.recovery_smtp_deadline_seconds >= self.outbox_lease_seconds:
+            raise ValueError('Recovery SMTP deadline must be shorter than the lease')
         if self.environment == 'production' and (not self.beta_allowed_emails or not self.abuse_limits_enabled):
             raise ValueError('Production beta requires an explicit account allowlist and abuse controls')
         if self.email_provider == 'smtp' and (not self.smtp_host or not self.email_from):

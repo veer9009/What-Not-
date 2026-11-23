@@ -9,12 +9,15 @@ from app.services.workers import process_email
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=['auto-complete', 'process-email', 'expire-properties'])
+    parser.add_argument('command', choices=['auto-complete', 'process-email', 'process-recovery-email', 'expire-properties'])
     args = parser.parse_args()
     settings = Settings()
     engine = build_engine(settings)
     try:
-        if args.command == 'process-email':
+        if args.command == 'process-recovery-email':
+            from app.services.recovery_delivery import process_recovery_email
+            count = process_recovery_email(engine, settings)
+        elif args.command == 'process-email':
             count = process_email(engine, settings)
         else:
             with Session(engine) as session, session.begin():

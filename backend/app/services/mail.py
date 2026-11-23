@@ -56,3 +56,37 @@ class SMTPMailProvider:
         except (OSError, smtplib.SMTPException):
             raise MailFailure('SMTP_UNAVAILABLE') from None
         return reference
+
+
+class RecoverySMTPProvider:
+    """A killable SMTP child gives recovery a total deadline, including DNS.
+
+    Secrets travel in anonymous stdin, never argv, files or environment updates.
+    stdout/stderr are discarded; the child returns only a fixed exit category.
+    """
+    def __init__(self, settings):
+        self.settings = settings
+
+    def send(self, recipient, title, body, idempotency_key):
+        import json
+        import os
+        import subprocess
+        import sys
+        import time
+        settings = self.settings
+        options = {name: getattr(settings, name) for name in (
+            'smtp_host', 'smtp_port', 'smtp_username', 'smtp_starttls', 'email_from')}
+        options['smtp_password'] = settings.smtp_password.get_secret_value() if settings.smtp_password else None
+        options['smtp_timeout_seconds'] = min(settings.smtp_timeout_seconds, settings.recovery_smtp_deadline_seconds)
+        payload = json.dumps({'settings': options, 'message': [recipient, title, body, idempotency_key]})
+        try:
+            deadline = time.monotonic() + settings.recovery_smtp_deadline_seconds
+            result = subprocess.run([sys.executable, '-m', 'app.recovery_smtp', str(deadline)], input=payload,
+                text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=settings.recovery_smtp_deadline_seconds,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+        except (subprocess.TimeoutExpired, OSError):
+            raise MailFailure('SMTP_DEADLINE') from None
+        if result.returncode:
+            raise MailFailure('SMTP_FAILURE', permanent=result.returncode == 2)
+        return '<' + sha256(idempotency_key.encode()).hexdigest() + '@whatnot.local>'

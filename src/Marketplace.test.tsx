@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { setAccessToken } from './api/client';
-const shop={id:2,user_id:1,shop_name:'Ravi Studio',description:null,phone:'1000000001',latitude:'19.000000',longitude:'72.000000',is_verified:false};
+const shop={id:2,user_id:1,shop_name:'Ravi Studio',description:null,phone:'1000000001',latitude:'19.000000',longitude:'72.000000',is_verified:false,dispatch_location_confirmed_at:'2026-11-23T00:00:00Z'};
 const product={id:3,seller_id:2,name:'Local Candle',description:'Handmade candle',price:'250.00',stock_quantity:2,category:'Crafts',delivery_radius_km:2,image_url:null,status:'REJECTED',rejection_reason:'Improve photo',is_active:true,updated_at:'2026-11-03T12:00:00.123456Z'};
 const address={id:4,user_id:1,label:'Home',address_line1:'Maker Lane',address_line2:null,city:'Mumbai',state:'Maharashtra',pincode:'400001',latitude:'19',longitude:'72',is_default:false};
 const order={id:5,buyer_id:1,seller_id:2,status:'PLACED',subtotal:'250.00',delivery_fee:'0.00',total:'250.00',items:[{product_id:3,seller_id:2,name:'Local Candle',quantity:1,unit_price:'250.00'}]};
@@ -20,7 +20,28 @@ describe('secure seller/admin workflows', () => {
   });
   it('toggles activation through API and reloads', async () => { let active=true; setup('/seller','SELLER',(path,method,body) => { if(path==='/sellers/me')return [200,shop]; if(path==='/sellers/me/products')return [200,[{...product,is_active:active}]]; expect(path).toBe('/products/3/activation'); expect(body).toEqual({is_active:false}); active=false; return [200,{}]; }); await screen.findByText('Local Candle'); await userEvent.click(screen.getByRole('button',{name:'Deactivate'})); await screen.findByText('Inactive'); });
   it('handles no profile truthfully with a setup link', async () => { setup('/seller','SELLER',()=>[404,{}]); await screen.findByText(/Set up your seller profile/i); expect(screen.getByRole('link',{name:/create seller profile/i})).toHaveAttribute('href','/seller/profile'); });
-  it('creates a complete profile without owner or verification fields', async () => { let created=false; setup('/seller/profile','SELLER',(path,method,body) => { if(method==='GET')return [created?200:404,created?shop:{}]; expect(path).toBe('/sellers/me'); expect(method).toBe('POST'); expect(Object.keys(body).sort()).toEqual(['description','latitude','longitude','phone','shop_name']); created=true; return [201,shop]; }); await screen.findByRole('heading',{name:'Create seller profile'}); await userEvent.type(screen.getByLabelText('Shop name'),'Ravi Studio'); await userEvent.type(screen.getByLabelText('Phone'),'1000000001'); await userEvent.type(screen.getByLabelText('Latitude'),'19'); await userEvent.type(screen.getByLabelText('Longitude'),'72'); await userEvent.click(screen.getByRole('button',{name:'Save profile'})); await screen.findByRole('status'); });
+  it('creates a complete profile without owner or verification fields', async () => {
+    let created=false;
+    const fetcher=setup('/seller/profile','SELLER',(path,method,body) => {
+      if(method==='GET')return [created?200:404,created?shop:{}];
+      if(path==='/sellers/me/dispatch-location'){
+        expect(method).toBe('PATCH');expect(body).toEqual({latitude:19,longitude:72});return [200,shop];
+      }
+      expect(path).toBe('/sellers/me');expect(method).toBe('POST');
+      expect(Object.keys(body).sort()).toEqual(['description','latitude','longitude','phone','shop_name']);
+      created=true;return [201,shop];
+    });
+    await screen.findByRole('heading',{name:'Create seller profile'});
+    await userEvent.type(screen.getByLabelText('Shop name'),'Ravi Studio');
+    await userEvent.type(screen.getByLabelText('Phone'),'1000000001');
+    await userEvent.click(screen.getByText('Enter coordinates manually'));
+    await userEvent.type(screen.getByLabelText('Latitude'),'19');await userEvent.type(screen.getByLabelText('Longitude'),'72');
+    await userEvent.click(screen.getByRole('checkbox',{name:/I confirm this is where I send products from/i}));
+    await userEvent.click(screen.getByRole('button',{name:'Save profile'}));
+    await screen.findByText(/Shop location saved/i);
+    expect(fetcher.mock.calls.filter(([,options])=>options.method!=='GET')).toHaveLength(2);
+    expect(fetcher.mock.calls.some(([url])=>url.endsWith('/public-discovery-location'))).toBe(false);
+  });
   it('updates an existing profile through PATCH', async () => { let changed=false; setup('/seller/profile','SELLER',(path,method,body)=>{if(method==='GET')return [200,{...shop,shop_name:changed?'Updated Studio':shop.shop_name}]; expect(method).toBe('PATCH'); expect(body.shop_name).toBe('Updated Studio'); changed=true; return [200,shop];}); await screen.findByDisplayValue('Ravi Studio'); await userEvent.clear(screen.getByLabelText('Shop name')); await userEvent.type(screen.getByLabelText('Shop name'),'Updated Studio'); await userEvent.click(screen.getByRole('button',{name:'Save profile'})); await screen.findByDisplayValue('Updated Studio'); });
   it('creates a product without moderation/actor fields or fake geography', async () => { setup('/seller/products/new','SELLER',(path,method,body) => { if(path==='/sellers/me')return [200,shop]; if(path==='/sellers/me/products')return [200,[]]; expect(path).toBe('/products'); expect(method).toBe('POST'); expect(body.name).toBe('New Candle'); expect(body.price).toBe('250'); expect(body.stock_quantity).toBe(2); expect(body).not.toHaveProperty('seller_id'); expect(body).not.toHaveProperty('status'); return [201,{...product,status:'PENDING'}]; }); await screen.findByLabelText('Product Name'); await userEvent.type(screen.getByLabelText('Product Name'),'New Candle'); await userEvent.type(screen.getByLabelText('Description'),'Handmade candle'); await userEvent.type(screen.getByLabelText('Price (₹)'),'250'); await userEvent.type(screen.getByLabelText('Available Quantity'),'2'); await userEvent.click(screen.getByRole('button',{name:/submit for admin approval/i})); await screen.findByRole('heading',{name:'Your local storefront'}); });
   it('edits an owned product and preserves rejected review behavior', async () => { setup('/seller/products/3/edit','SELLER',(path,method,body)=>{if(method==='GET')return path==='/sellers/me'?[200,shop]:[200,[product]]; expect(path).toBe('/products/3'); expect(method).toBe('PATCH'); expect(body).toEqual({name:'Updated Candle'}); expect(body).not.toHaveProperty('status');return [200,product];}); await screen.findByDisplayValue('Local Candle'); expect(screen.getByText('Improve photo')).toBeInTheDocument(); await userEvent.clear(screen.getByLabelText('Product Name')); await userEvent.type(screen.getByLabelText('Product Name'),'Updated Candle'); await userEvent.click(screen.getByRole('button',{name:'Save Changes'})); await screen.findByRole('heading',{name:'Your local storefront'}); });

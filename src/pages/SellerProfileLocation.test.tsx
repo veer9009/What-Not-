@@ -47,12 +47,15 @@ it.each([true, false])('acquires only on click and fills an unsaved draft (exist
   expect(writes).not.toHaveBeenCalled();
   expect(screen.getByRole('button', { name: 'Save profile' })).toBeEnabled();
   if (existing) {
+    fireEvent.click(screen.getByRole('checkbox', { name: /I confirm this is where I send products from/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
     await waitFor(() => expect(writes).toHaveBeenCalledWith('/api/v1/sellers/me', 'PATCH', {
       shop_name: 'Maker', phone: '100', description: null, latitude: '12.123457', longitude: '-45.123457',
     }));
-    expect(writes).toHaveBeenCalledOnce();
-    await screen.findByText(/profile saved/i);
+    await waitFor(() => expect(writes).toHaveBeenCalledWith('/api/v1/sellers/me/dispatch-location', 'PATCH', { latitude: 12.123457, longitude: -45.123457 }));
+    expect(writes).toHaveBeenCalledTimes(2);
+    expect(writes.mock.calls.some(([path]) => path.endsWith('/public-discovery-location'))).toBe(false);
+    await screen.findByText(/Shop location saved/i);
     expect(screen.queryByText(/nothing has been saved/i)).not.toBeInTheDocument();
   }
 });
@@ -64,6 +67,7 @@ it.each([[1, /permission was denied/i], [2, /position is unavailable/i], [3, /ti
     expect(screen.getByRole('alert')).toHaveTextContent(message);
     expect(screen.getByLabelText('Latitude')).toHaveValue(19);
     fireEvent.change(screen.getByLabelText('Latitude'), { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /I confirm this is where I send products from/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
     await waitFor(() => expect(writes).toHaveBeenCalledWith('/api/v1/sellers/me', 'PATCH', expect.objectContaining({ latitude: '20', longitude: '72' })));
   });

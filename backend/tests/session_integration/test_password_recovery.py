@@ -48,7 +48,8 @@ def recovery(session_engine):
         session.add(user)
         session.flush()
         uid = user.id
-    with TestClient(app, base_url=ORIGIN) as client:
+    # Isolate source quotas across independent cases, keeping all limits active.
+    with TestClient(app, base_url=ORIGIN, client=('synthetic-test-' + uuid4().hex, 43000)) as client:
         yield client, session_engine, config, mail, uid, email
 
 

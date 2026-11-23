@@ -28,6 +28,13 @@ def owned_seller(session, actor_id, seller_id):
     return seller
 
 
+def _revoke_public_discovery(seller):
+    seller.public_discovery_latitude = None
+    seller.public_discovery_longitude = None
+    seller.public_discovery_confirmed_at = None
+    seller.public_discovery_consent_version = None
+
+
 class SellerService:
     def __init__(self, session: Session):
         self.session = session
@@ -57,6 +64,7 @@ class SellerService:
         if any(key in {'latitude', 'longitude'} and getattr(seller, key) != value
                for key, value in data.model_dump(exclude_unset=True).items()):
             seller.dispatch_location_confirmed_at = None
+            _revoke_public_discovery(seller)
         for key, value in data.model_dump(exclude_unset=True).items():
             setattr(seller, key, value)
         return seller
@@ -69,6 +77,8 @@ class SellerService:
         if profile is None:
             raise SellerNotFound('Seller profile does not exist')
         seller = self.repository.get(profile.id, lock=True)
+        if seller.latitude != data.latitude or seller.longitude != data.longitude:
+            _revoke_public_discovery(seller)
         seller.latitude = data.latitude
         seller.longitude = data.longitude
         seller.dispatch_location_confirmed_at = datetime.now(timezone.utc)

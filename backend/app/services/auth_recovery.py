@@ -1,4 +1,4 @@
-"""User -> recovery -> auth session locking; delivery is transient after commit."""
+"""User -> recovery -> delivery/session locking; durable encrypted live mail."""
 from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
@@ -29,10 +29,20 @@ def recovery_key(settings):
 
 
 def recovery_ready(settings, provider=None):
-    """Live recovery is blocked pending durable delivery; synthetic tests only."""
+    """Default-off activation; legacy fake-only tests cannot enable live SMTP."""
     recovery_key(settings)
-    if settings.environment != 'test' or not isinstance(provider, FakeMailProvider):
+    synthetic = settings.environment == 'test' and isinstance(provider, FakeMailProvider)
+    if not settings.recovery_delivery_enabled:
+        if synthetic:
+            return
         raise HTTPException(503, 'Password recovery is unavailable')
+    if not settings.recovery_active_key or not settings.recovery_encryption_keys or (settings.email_provider != 'smtp' and not synthetic):
+        raise HTTPException(503, 'Password recovery is unavailable')
+    try:
+        from app.services.recovery_delivery import aesgcm
+        aesgcm()
+    except ImportError:
+        raise HTTPException(503, 'Password recovery is unavailable') from None
 
 
 def digest(settings, purpose, raw):
@@ -88,6 +98,7 @@ class PasswordRecoveryService:
         email_digest = digest(self.settings, 'email', email)
         matches = UserRepository(self.session).by_normalized_email(email)
         user = UserRepository(self.session).get(matches[0].id, lock=True) if len(matches) == 1 else None
+        now = datetime.now(timezone.utc)
         recent = self.session.scalar(select(PasswordRecovery.challenge).where(
             PasswordRecovery.email_digest == email_digest,
             PasswordRecovery.created_at > now - timedelta(seconds=60)).limit(1))
@@ -99,12 +110,20 @@ class PasswordRecoveryService:
             self.session.execute(update(PasswordRecovery).where(
                 PasswordRecovery.user_id == user.id,
                 PasswordRecovery.used_at.is_(None)).values(used_at=now))
+            if self.settings.recovery_delivery_enabled:
+                from app.services.recovery_delivery import cancel_recovery_jobs
+                cancel_recovery_jobs(self.session, user.id)
         # Every attempt receives a fresh opaque challenge, including suppressed mail.
         row = PasswordRecovery(challenge=challenge, user_id=user.id if eligible else None,
             email_digest=email_digest, otp_digest=digest(self.settings, 'otp', challenge + ':' + otp),
             password_binding=self._binding(user) if eligible else digest(self.settings, 'password', challenge),
             created_at=now, expires_at=now + timedelta(minutes=5), attempts=0)
         self.session.add(row)
+        if eligible and self.settings.recovery_delivery_enabled:
+            from app.services.recovery_delivery import enqueue_recovery
+            enqueue_recovery(self.session, self.settings, row, email, otp)
+            logger.info('password_recovery_requested')
+            return challenge, None
         logger.info('password_recovery_requested')
         return challenge, (email, challenge, otp) if eligible else None
 
@@ -132,6 +151,9 @@ class PasswordRecoveryService:
         raw = secrets.token_urlsafe(32)
         row.verified_at, row.reset_digest = now, digest(self.settings, 'reset', raw)
         row.reset_expires_at = now + timedelta(minutes=5)
+        if self.settings.recovery_delivery_enabled:
+            from app.services.recovery_delivery import cancel_recovery_jobs
+            cancel_recovery_jobs(self.session, user.id)
         return raw
 
     @write_operation
@@ -143,6 +165,9 @@ class PasswordRecoveryService:
             return False
         user.password_hash = hash_password(password)
         row.used_at = now
+        if self.settings.recovery_delivery_enabled:
+            from app.services.recovery_delivery import cancel_recovery_jobs
+            cancel_recovery_jobs(self.session, user.id)
         families = self.session.scalars(select(AuthSession).where(AuthSession.user_id == user.id)
             .order_by(AuthSession.id).with_for_update()).all()
         for family in families:

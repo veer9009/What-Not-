@@ -46,8 +46,11 @@ try {
       await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
       const geometry = await evaluate(`(()=>{const rect=e=>e.getBoundingClientRect(),visible=e=>rect(e).width>0&&rect(e).height>0;const form=document.querySelector('form'),art=document.querySelector('.login-discovery-art'),image=art.querySelector('picture img');return {width:innerWidth,documentFits:document.documentElement.scrollWidth<=innerWidth,overflow:[...document.querySelectorAll('.community-login,.login-form-wrap,form,aside')].filter(visible).filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>e.className||e.tagName),fieldsContained:[...form.querySelectorAll('input,button,select')].filter(visible).every(e=>rect(e).left>=0&&rect(e).right<=innerWidth&&rect(e).height>=44),formTop:rect(form).top,formProminent:innerWidth>700||rect(form).top<390,artHiddenOnMobile:innerWidth>700||getComputedStyle(art).display==='none',splitLayout:innerWidth<=700||rect(document.querySelector('.login-form-wrap')).left>=rect(document.querySelector('aside')).right-1,imagesLoaded:innerWidth<=700||[...art.querySelectorAll('img')].every(i=>i.complete&&i.naturalWidth>0),neighborhoodUndistorted:innerWidth<=700||Math.abs(rect(image).width/rect(image).height-976/596)<.01,approvedAsset:!!(image.currentSrc||image.src).match(/neighborhood-world/),mapAbsent:![...document.images].some(i=>/india|boundary|country-outline|district-map|state-map/.test(i.currentSrc||i.src)),gpsCalls:window.__gpsCalls,links:[...form.querySelectorAll('a')].map(a=>a.getAttribute('href')),fontFaces:[...document.fonts].map(f=>({family:f.family,status:f.status}))};})()`);
       geometry.path=path;geometry.step=step;
+      geometry.registration = await evaluate(`({heading:document.querySelector('form h2')?.textContent,accountSelector:!!document.querySelector('form select')})`);
       geometry.passed = geometry.documentFits && !geometry.overflow.length && geometry.fieldsContained && geometry.formProminent && geometry.artHiddenOnMobile && geometry.splitLayout && geometry.imagesLoaded && geometry.neighborhoodUndistorted && geometry.approvedAsset && geometry.mapAbsent && geometry.gpsCalls === 0;
-      if (path.startsWith('/login')) geometry.passed &&= ['/forgot-password', '/register', '/register?role=seller'].every(link => geometry.links.includes(link));
+      if (path.startsWith('/login')) geometry.passed &&= ['/forgot-password', '/register?role=buyer', '/register?role=seller', '/register?intent=services'].every(link => geometry.links.includes(link));
+      const registrationTitle = {'/register?role=seller':'Create Seller Account','/register?role=buyer':'Create Buyer Account','/register?intent=services':'Service Provider Registration'}[path];
+      if (registrationTitle) geometry.passed &&= geometry.registration.heading === registrationTitle && !geometry.registration.accountSelector;
       results.push(geometry);
       const screenshot = await command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
       const name=path.slice(1).replace(/[^a-zA-Z0-9-]/g,'-');
@@ -59,7 +62,7 @@ try {
     throw Error('Expected UI did not appear: '+expression);
   }
   async function fill(selector,text){await evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`);await command('Input.insertText',{text});}
-  for (const path of ['/login', '/login/buyer', '/login/seller', '/register', '/register?role=seller', '/forgot-password']) {
+  for (const path of ['/login', '/login/buyer', '/login/seller', '/login?intent=services', '/register', '/register?role=seller', '/register?role=buyer', '/register?intent=services', '/forgot-password']) {
     for (const width of [390, 768, 1440]) {
       await command('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: width < 600 });
       await command('Page.navigate', { url: `http://127.0.0.1:5173${path}` });

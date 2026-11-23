@@ -214,6 +214,14 @@ Library references: [argon2-cffi parameters](https://argon2-cffi.readthedocs.io/
 and [PyJWT usage](https://pyjwt.readthedocs.io/en/latest/usage.html).
 # Email password recovery
 
+**Current implementation:** the durable encrypted outbox and disabled-by-default
+activation procedure replace the earlier transient delivery mechanism. See
+[`DURABLE_RECOVERY_OPERATIONS.md`](../docs/security/DURABLE_RECOVERY_OPERATIONS.md).
+Migration 0012 is additive and was not applied. SMTP configuration alone does not
+enable recovery. Production activation still requires separately authorized
+staging validation; the default remains unavailable. The legacy fake-only path is
+retained for existing synthetic tests, never for live delivery.
+
 The three same-origin CSRF-protected POST endpoints are
 `/api/v1/auth/password-recovery/request` (`email`), `/verify` (`challenge`, `otp`),
 and `/reset` (`reset_token`, `password`). Requests return HTTP 202 with a generic
@@ -222,20 +230,21 @@ non-admitted and rate-limited accounts. Verify returns a reset token or generic
 HTTP 400; reset returns `Password updated. Sign in again.` or generic HTTP 400.
 All responses use no-store. Password whitespace is preserved.
 
-Live recovery is deliberately disabled in every environment until durable email
-delivery has an approved implementation. All three endpoints return generic 503
-before quota or recovery queries, even if SMTP and a recovery key are configured.
-Only a `FakeMailProvider` injected into a `test` application enables synthetic
-tests; this adapter never sends email. There is no flag to enable transient SMTP.
+Live recovery is disabled by default. All three endpoints return generic 503
+before quota or recovery queries unless durable delivery is explicitly activated
+with its dependency, independent keys and SMTP prerequisites. SMTP configuration
+alone does not enable recovery. A `FakeMailProvider` in a `test` application still
+enables legacy synthetic tests; this adapter never sends email. No flag enables
+transient live SMTP. Activation is a later separately authorized staging action.
 
-An operator must separately review additive migration `0011` before any future
+An operator must separately review additive migration `0012` and its `0011` parent before any future
 activation. No migration runs automatically. A future activation requires
 `WHAT_NOT_PASSWORD_RECOVERY_KEY` through a
 secret manager to a securely generated secret of at least 32 bytes. Missing keys
 fail closed with HTTP 503. Do not reuse the JWT signing key. Rotating this key
 invalidates outstanding recovery credentials. Configure the existing
 `WHAT_NOT_EMAIL_PROVIDER=smtp`, SMTP host, sender, TLS and authentication secrets
-for actual delivery only after the durable-delivery blocker is resolved. Existing
+for actual delivery only after the deployment checks in the runbook pass. Existing
 SMTP settings do not enable password recovery. Never put operational secrets in committed env files.
 
 Codes use six cryptographically random digits, expire after five minutes and
@@ -265,20 +274,22 @@ Only synthetic fake delivery still uses this background path. Delivery failures
 log a fixed event name. Events exclude emails, codes, passwords, reset tokens and
 mail exception text.
 
-### Operator decision required: durable delivery
+### Durable delivery and remaining operator decisions
 
 The existing database email outbox has plaintext notification title/body fields;
 placing recovery messages there would persist OTP plaintext and violate recovery
 storage guarantees. HMAC digests alone cannot reconstruct an email after restart.
-A suitable beta design can reuse PostgreSQL and the existing worker lifecycle,
-but requires separately approved authenticated encryption for a short-lived OTP
-payload, a separate managed encryption key (not JWT/HMAC key), atomic enqueue with
-challenge issuance, leases and bounded retries, and expiry/supersession checks
-before sending. Define key rotation, encrypted-payload erasure, worker supervision
-and the unavoidable SMTP send/ack duplicate window. Do not add Redis or Celery
-merely for this workflow. No new worker, queue, encryption dependency, key or schema
-was added in this review. Keep live recovery disabled until that design is approved,
-implemented and tested with synthetic mail; configuring SMTP alone is insufficient.
+The approved implementation adds a recovery-specific encrypted outbox in 0012,
+AES-256-GCM through the cryptography package, a separate versioned managed key,
+atomic enqueue, leased retries, expiry/supersession checks and terminal payload
+erasure. The bounded worker command is `python -m app.workers process-recovery-email`.
+Parent and child enforce a total SMTP deadline, including when the worker dies.
+User/recovery/job locks serialize active sends with supersession; an entire send
+budget must remain on the lease and OTP. SMTP acceptance followed by lost DB
+acknowledgement can duplicate delivery, so no exactly-once guarantee is claimed.
+No Redis or Celery was added. Key provisioning/rotation, worker supervision,
+pool/DB timeout sizing, backup retention and staging fault tests remain operator
+requirements. Keep live recovery disabled until those checks are accepted.
 
 ### Migration review and rollback
 
@@ -288,7 +299,10 @@ indexes. PostgreSQL BIGINT/TIMESTAMPTZ types match the existing users and UTC-aw
 credential lifecycle. It does not update existing user or authentication rows.
 Application writes constrain attempt counts and timestamps; no new migration was
 needed for supersession. Review the intended database identity, schema/search_path,
-ownership and current revision `0010` before an operator applies this migration.
+ownership and current revision before an operator applies any migration.
+`0012` follows `0011`, adds only encrypted delivery records with restrictive FKs,
+state/payload/lease constraints and indexes, and does not rewrite existing data.
+The application readiness/bootstrap schema expectation now matches `0012`.
 The review exercised offline PostgreSQL DDL compilation only, never Alembic against
 a database. Integration tests use ORM metadata in a guarded disposable schema.
 
@@ -298,7 +312,16 @@ restoration into a separate disposable database. Stop writes or establish a
 documented consistent snapshot and recovery point; retain a tested matching app
 build. Verify row counts, foreign keys and authentication after restoration.
 If the additive upgrade fails, inspect its transaction result before retrying.
-Prefer rolling back the app while retaining the additive table. Downgrade refuses
+The old application at commit 0a85de5 expects schema 0010; this build expects
+0012. Readiness requires an exact revision match, so a simple code rollback while
+retaining schema 0012 may fail readiness. Retain additive tables only with a
+rollback build tested against that schema, including readiness and authentication.
+Before rollback, verify the actual revision, preserve matching backend/frontend
+artifacts and configuration, and quiesce application writes and workers. Require
+the verified backup and isolated restore rehearsal described above. If returning
+to schema 0010, separately review and rehearse each downgrade or restore a verified
+schema-0010 backup with its matching application. Do not blindly downgrade a
+populated database. Downgrade refuses
 nonempty recovery history deliberately: never delete records to force it. It takes
 an ACCESS EXCLUSIVE table lock before checking emptiness, held through DROP by
 Alembic's PostgreSQL transaction, so concurrent issuance cannot insert history

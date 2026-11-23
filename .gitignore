@@ -24,6 +24,7 @@ backend/.env
 !**/.env.*.example
 
 # Local verification reports (do not commit)
+/codex-auth-review.txt
 /local-*.json
 /product-image-frontend-*.json
 /docs/security/evidence/
