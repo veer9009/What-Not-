@@ -1,0 +1,33 @@
+/* Payment-only semantic accents requested for the existing dashboard. */
+.payments-workspace, .seller-payments { --payment-blue: #315d86; --payment-blue-soft: #edf4fa; --payment-green-soft: #e8f3eb; --payment-amber-soft: #fff5df; }
+.payment-method-label { display: inline-flex; align-items: center; gap: 7px; }
+.payment-method-label svg { flex-shrink: 0; }
+.payment-method-options { min-width: 0; margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.payment-method-options legend { margin-bottom: 12px; font-weight: 600; }
+.payments-workspace .payment-method-choice { display: flex; align-items: start; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius-control); padding: 16px; cursor: pointer; min-width: 0; }
+.payment-method-choice:has(input:checked) { background: var(--payment-green-soft); border-color: var(--color-success); }
+.payment-method-choice:focus-within { outline: 2px solid var(--ink); outline-offset: 3px; }
+.payments-workspace .product-form .payment-method-choice input[type=radio] { width: 18px; height: 18px; margin: 3px 0 0; flex-shrink: 0; }
+.payment-method-choice > svg { flex-shrink: 0; margin-top: 1px; }
+.payment-method-choice strong, .payment-method-choice small { display: block; }
+.payments-workspace .payment-method-choice small { margin-top: 8px; font-weight: 400; font-size: .8125rem; line-height: 1.5; color: var(--muted); }
+.payment-unverified { display: block; color: var(--muted); font-size: .8125rem; margin-block: 8px; }
+.seller-payments .payment-status[data-status=SELLER_CONFIRMED], .payments-workspace .payment-status[data-status=SELLER_CONFIRMED] { color: var(--color-success); background: var(--payment-green-soft); }
+.seller-payments .payment-status[data-status=PENDING], .payments-workspace .payment-status[data-status=PENDING] { color: var(--color-warning); background: var(--payment-amber-soft); }
+.seller-payments .payment-status[data-status=BUYER_REPORTED], .payments-workspace .payment-status[data-status=BUYER_REPORTED] { color: var(--payment-blue); background: var(--payment-blue-soft); }
+.seller-payment-metrics > div[data-accent=orders] { border-top: 3px solid var(--payment-blue); background: var(--payment-blue-soft); }
+.seller-payment-metrics > div[data-accent=confirmed] { border-top: 3px solid var(--color-success); background: var(--payment-green-soft); }
+.seller-payment-metrics > div[data-accent=awaiting] { border-top: 3px solid var(--color-warning); background: var(--payment-amber-soft); }
+.payment-method-filters { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--paper); }
+.payment-method-filters button { min-height: 44px; padding: 10px 14px; border: 0; border-radius: var(--radius-control); color: var(--muted); background: transparent; font: inherit; font-size: .875rem; cursor: pointer; }
+.payment-method-filters button[aria-pressed=true] { background: var(--green); color: var(--paper); }
+.payment-method-filters button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.payment-method-filters button:disabled { cursor: default; opacity: .6; }
+.seller-payment-filter-scope { font-size: .8125rem; color: var(--muted); margin: 0 0 16px; }
+.seller-record-status { min-width: 0; max-width: 100%; }
+.seller-record-reference { font-size: .8125rem; overflow-wrap: anywhere; font-weight: 400; margin: 10px 0 0; }
+@media (max-width: 760px) {
+  .payment-method-options { grid-template-columns: minmax(0,1fr); }
+  .payment-method-filters { display: flex; }
+  .payment-method-filters button { flex: 1; padding-inline: 8px; }
+}

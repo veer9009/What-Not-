@@ -30,6 +30,14 @@ beforeEach(() => {
 });
 afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function profile() { render(<MemoryRouter><SellerProfilePage/></MemoryRouter>); await screen.findByRole('button', {name:'Save profile'}); }
+it('keeps the Products navigation target actionable before a shop is created',async()=>{
+  current=null;
+  render(<MemoryRouter initialEntries={['/seller#products']}><SellerDashboard/></MemoryRouter>);
+  await screen.findByRole('heading',{name:'Set up your seller profile'});
+  const target=document.getElementById('products');
+  expect(target).not.toBeNull();
+  expect(target).toHaveTextContent('Create seller profile');
+});
 function submit() { fireEvent.submit(screen.getByRole('button', {name:'Save profile'}).closest('form')!); }
 function consent() {
   fireEvent.click(screen.getByRole('checkbox', {name:/I confirm this is where I send products from/i}));
@@ -118,13 +126,13 @@ it('explains missing shop setup instead of equating product approval with discov
   render(<MemoryRouter><SellerDashboard/></MemoryRouter>);
   expect(await screen.findByRole('link', {name:'Complete shop location'})).toHaveAttribute('href','/seller/profile');
   expect(screen.getByText(/Choose a public shop point and give permission/i)).toBeInTheDocument();
-  expect(screen.getByText('Ready for nearby discovery').parentElement).toHaveTextContent('0');
+  expect(screen.getByText('Discovery ready').parentElement).toHaveTextContent('0');
 });
 
 it('counts only approved active stocked listings after complete location setup', async () => {
   vi.mocked(productsApi.own).mockResolvedValue([product, {...product,id:'4',stock_quantity:0}, {...product,id:'5',status:'PENDING'}, {...product,id:'6',is_active:false}]);
   render(<MemoryRouter><SellerDashboard/></MemoryRouter>);
-  const metric = await screen.findByText('Ready for nearby discovery');
+  const metric = await screen.findByText('Discovery ready');
   expect(metric.parentElement).toHaveTextContent('1');
   expect(screen.getByText(/Buyers must be within range.*checkout/i)).toBeInTheDocument();
   expect(screen.queryByRole('link', {name:'Complete shop location'})).not.toBeInTheDocument();

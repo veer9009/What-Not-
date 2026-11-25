@@ -1,33 +1,95 @@
-import { HelpCircle, MapPin, Menu, MessageCircle, ShoppingBag, Star, X } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Bell, CalendarDays, ClipboardCheck, FileText, Heart, HelpCircle, House, HousePlus, Images, LayoutDashboard, LogOut, MapPin, MessageCircle, MessageSquare, Package, Palette, PlusCircle, ShoppingBasket, ShoppingBag, ShoppingCart, Star, Store, UserRound, type LucideIcon } from 'lucide-react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../state/AuthContext';
 import type { Product, ProductStatus } from '../types';
 import { supportUrl } from '../utils/support';
 import { ListingImage } from './ListingImage';
+import { Wallet } from 'lucide-react';
+import { MobileNavigation, useMobileNavigation } from './MobileNavigation';
 
 export function Logo({ light = false }: { light?: boolean }) {
-  return <Link className={`logo ${light ? 'logo-light' : ''}`} to="/"><span className="logo-mark">N</span><span>What Not?<small>discover local possibilities</small></span></Link>;
+  return <Link className={`logo ${light ? 'logo-light' : ''}`} to="/" aria-label="What Not? Home"><span className="logo-mark" aria-hidden="true">N</span><span>What Not?<small>discover local possibilities</small></span></Link>;
+}
+export interface NavigationItem {href:string;label:string;icon:LucideIcon;matchPrefix?:string;group?:string}
+function useSectionTarget(content?:ReactNode){
+  const {pathname,hash,key:locationKey}=useLocation();const handled=useRef('');
+  useEffect(()=>{
+    const key=locationKey+pathname+hash;if(handled.current===key)return;
+    const initial=handled.current==='';
+    if(!hash){
+      handled.current=key;
+      if(initial&&locationKey==='default')return;
+      const main=document.getElementById('main-content');
+      main?.focus({preventScroll:true});window.scrollTo({top:0,left:0,behavior:'instant'});
+      return;
+    }
+    const target=document.getElementById(hash.slice(1));
+    if(target){target.tabIndex=-1;target.focus({preventScroll:true});target.scrollIntoView?.({block:'start'});handled.current=key;}
+  },[pathname,hash,locationKey,content]);
+}
+const publicLinks:NavigationItem[]=[
+  {href:'/',label:'Home',icon:House},
+  {href:'/#homemade',label:'Homemade Products',icon:ShoppingBasket},
+  {href:'/#real-estate',label:'Real Estate',icon:HousePlus},
+  {href:'/#creative-services',label:'Creative Services',icon:Palette},
+  {href:'/login/seller',label:'Become a Seller',icon:Store},
+  {href:'/login',label:'Login',icon:UserRound},
+];
+function SidebarLinks({items,label}:{items:NavigationItem[];label:string}){
+  const location=useLocation();
+  const exact=items.find(item=>item.href===location.pathname+location.hash);
+  const active=exact??items.filter(item=>item.matchPrefix?location.pathname.startsWith(item.matchPrefix):!item.href.includes('#')&&item.href!=='/'&&(location.pathname===item.href||location.pathname.startsWith(item.href+'/'))).sort((a,b)=>(b.matchPrefix??b.href).length-(a.matchPrefix??a.href).length)[0];
+  const groups=[...new Set(items.map(item=>item.group??''))];
+  return <nav aria-label={label}>{groups.map(group=><div className="sidebar-group" key={group}>{group&&<p className="nav-group-title">{group}</p>}{items.filter(item=>(item.group??'')===group).map(({href,label,icon:Icon})=>{const selected=active?.href===href&&active?.label===label;return <Link key={`${href}:${label}`} to={href} aria-label={label} title={label} aria-current={selected?(exact?.href===href&&href.includes('#')?'location':'page'):undefined} className={selected?'active':undefined}><Icon size={20} aria-hidden="true"/><span className="nav-label">{label}</span></Link>;})}</div>)}</nav>;
+}
+export function PublicSidebar(){
+  useSectionTarget();const mobile=useMobileNavigation(),auth=useAuth();
+  const role=auth.user?.role.toLowerCase() as 'buyer'|'seller'|'admin'|undefined;
+  const items=role?[...workspaceLinks(role,false,true),...publicLinks.filter(item=>item.href==='/'||item.href.startsWith('/#'))]:publicLinks;
+  return mobile?<MobileNavigation items={items} role={role}/>:<aside className="app-sidebar public-sidebar" aria-label="Marketplace"><p className="eyebrow workspace-label">Explore</p><SidebarLinks items={publicLinks} label="Main navigation"/></aside>;
 }
 export function PublicHeader() {
-  const [open,setOpen]=useState(false);
-  return <header className="public-header"><Logo/><button className="menu-btn" onClick={()=>setOpen(!open)} aria-label="Toggle navigation" aria-expanded={open} aria-controls="public-navigation">{open?<X/>:<Menu/>}</button><nav id="public-navigation" aria-label="Main navigation" className={open?'open':''} onClick={()=>setOpen(false)}>
-    <a href="/#homemade">Homemade</a><a href="/#real-estate">Real Estate</a><a href="/#creative-services">Creative Services</a><Link to="/login/seller">Become a Seller</Link><Link className="btn btn-dark btn-sm" to="/login">Login</Link>
-  </nav></header>;
+  const {user}=useAuth();
+  const locationLink=user?.role==='SELLER'?'/seller/profile':user?.role==='ADMIN'?'/admin/addresses':'/buyer';
+  return <><PublicSidebar/><header className="public-header"><Logo/><Link className="marketplace-location-link" to={locationLink}><MapPin size={17} aria-hidden="true"/>{user?.role==='SELLER'?'Shop location':user?.role==='ADMIN'?'Saved addresses':'Choose your area'}</Link></header></>;
 }
 export function Rating({ value }: { value:number }) { return <span className="rating"><Star size={14} fill="currentColor" aria-hidden="true"/> Sample rating: {value}</span>; }
 export function StatusBadge({ status }: { status:ProductStatus | 'INACTIVE' | 'OUT_OF_STOCK' }) { const labels = { PENDING:'Pending', APPROVED:'Approved', REJECTED:'Rejected', INACTIVE:'Inactive', OUT_OF_STOCK:'Out of Stock' }; return <span className={`status ${status.toLowerCase()}`}>{labels[status]}</span>; }
 export function ProductCard({ product }: { product:Product }) {
-  return <article className="product-card"><div className="product-image"><ListingImage src={product.image} alt={product.name}/><span className="sample-product-label">Sample</span><span className="distance"><MapPin size={13}/>{product.distance} km</span></div><div className="product-body"><div className="product-meta"><span>{product.category}</span><Rating value={product.rating}/></div><h3>{product.name}</h3><p className="seller-line">{product.seller}</p><div className="price-row"><strong>₹{product.price.toLocaleString('en-IN')}</strong><Link className="text-link" to={`/buyer/samples/products/${product.id}`}>View product →</Link></div></div></article>;
+  return <article className="product-card"><div className="product-image"><ListingImage src={product.image} alt={product.name}/><span className="sample-product-label">Sample</span><span className="distance"><MapPin size={13} aria-hidden="true"/>Sample {product.distance} km</span></div><div className="product-body"><div className="product-meta"><span>{product.category}</span><Rating value={product.rating}/></div><h3>{product.name}</h3><p className="seller-line">{product.seller}</p><div className="price-row"><strong>₹{product.price.toLocaleString('en-IN')}</strong><Link className="text-link" to={`/buyer/samples/products/${product.id}`}>View product →</Link></div></div></article>;
 }
 export function RadiusSelector({ value,onChange,label='Distance radius' }: { value:number;onChange:(n:1|2|3)=>void;label?:string }) { return <div className="radius-select" role="group" aria-label={label}>{([1,2,3] as const).map(n=><button type="button" className={value===n?'active':''} aria-pressed={value===n} key={n} onClick={()=>onChange(n)}>{n} KM</button>)}</div>; }
 export function RadiusVisual() { return <div className="radius-visual"><span className="ring ring-3"><b>3 KM</b></span><span className="ring ring-2"><b>2 KM</b></span><span className="ring ring-1"><b>1 KM</b></span><span className="maker-pin">🏺<small>Local maker</small></span><span className="buyer-dot one">●<small>0.8 km</small></span><span className="buyer-dot two">●<small>1.7 km</small></span><span className="buyer-dot three">●<small>2.7 km</small></span></div>; }
 export function EmptyState({ title='Nothing nearby yet', description='Try widening your radius or clearing a filter.', action }: { title?:string;description?:string;action?:()=>void }) { return <div className="empty"><HelpCircle size={36}/><h3>{title}</h3><p>{description}</p>{action&&<button className="btn btn-outline" onClick={action}>Reset filters</button>}</div>; }
 export function WhatsAppButton() { return <div className="whatsapp"><span>Need help?<small>Chat with us on WhatsApp</small></span><a href={supportUrl()} target="_blank" rel="noreferrer" aria-label="Chat with us on WhatsApp"><MessageCircle/></a></div>; }
-export function DashboardShell({ role,children }: { role:'buyer'|'seller'|'admin';children:ReactNode }) {
-  const auth = useAuth(); const navigate = useNavigate();
-  const links = role==='buyer'?[['/buyer','Nearby discovery'],['/buyer/cart','Cart'],['/buyer/properties','Properties for sale'],['/buyer/properties/saved','Saved properties'],['/buyer/properties/requests','Enquiries & visits'],['/buyer/creative','Creative Services'],['/buyer/notifications','Notifications'],['/buyer/profile','Profile'],['/buyer/addresses','Addresses'],['/buyer/orders','Orders'],['/buyer/help','Help & Support']]:role==='seller'?[['/seller','Overview'],['/seller/profile','Shop profile'],['/seller/products/new','Add product'],['/seller/orders','Orders'],['/seller/notifications','Notifications'],['/seller/properties','Manage properties'],['/seller/properties/requests','Enquiries & visits'],['/seller/creative','Creative studio'],['/seller/addresses','Addresses']]:[['/admin','Product moderation'],['/admin/properties','Property moderation & reports'],['/admin/creative','Service moderation'],['/admin/operations','Orders, disputes & accounts'],['/admin/notifications','Notifications'],['/admin/addresses','Addresses']];
-  return <div className={`dash-shell ${role}`}><aside><Logo light={role==='admin'}/><p className="eyebrow">{role} workspace</p><nav aria-label="Workspace navigation">{links.map(([href,label])=><NavLink key={href} end to={href}>{label}</NavLink>)}</nav><p className="session-identity">{auth.user?.name}</p><button className="btn btn-outline btn-sm logout-button" onClick={()=>{auth.logout();navigate(role==='admin'?'/admin/login':`/login/${role}`,{replace:true});}}>Log out</button><Link className="back-home" to="/">Back to marketplace</Link></aside><main id="main-content" tabIndex={-1}>{children}</main></div>;
+function workspaceLinks(role:'buyer'|'seller'|'admin',creative:boolean,sectionsReady:boolean){
+  const entry=(href:string,label:string,icon:LucideIcon):NavigationItem=>({href,label,icon});
+  const links=role==='buyer'?[
+    entry('/buyer','Homemade Products',ShoppingBasket),entry('/buyer/cart','Cart',ShoppingCart),entry('/buyer/properties','Real Estate',HousePlus),entry('/buyer/properties/saved','Saved properties',Heart),entry('/buyer/properties/requests','Enquiries & visits',CalendarDays),entry('/buyer/creative','Creative Services',Palette),entry('/buyer/notifications','Notifications',Bell),entry('/buyer/profile','Profile',UserRound),entry('/buyer/addresses','Addresses',MapPin),entry('/buyer/orders','Orders',ShoppingBag),entry('/buyer/help','Help & Support',HelpCircle),
+  ]:role==='seller'?creative?[
+    entry('/seller/creative','Overview',LayoutDashboard),...(sectionsReady?[entry('/seller/creative#provider','Provider Profile',UserRound),entry('/seller/creative#services','Services',Palette),entry('/seller/creative#portfolio','Portfolio',Images),entry('/seller/creative#enquiries','Enquiries',MessageSquare),entry('/seller/creative#quotations','Quotations',FileText)]:[]),entry('/seller','Seller Studio',Store),entry('/seller/properties','Real Estate',HousePlus),entry('/seller/notifications','Notifications',Bell),entry('/seller/addresses','Addresses',MapPin),
+  ]:[
+    entry('/seller','Overview',LayoutDashboard),entry('/seller/profile','Shop Profile',Store),...(sectionsReady?[{...entry('/seller#products','Products',Package),matchPrefix:'/seller/products/'}]:[]),entry('/seller/products/new','Add product',PlusCircle),entry('/seller/orders','Orders',ShoppingBag),entry('/seller/creative','Creative Studio',Palette),entry('/seller/properties','Manage properties',HousePlus),entry('/seller/properties/requests','Enquiries & visits',CalendarDays),entry('/seller/notifications','Notifications',Bell),entry('/seller/addresses','Addresses',MapPin),
+  ]:[entry('/admin','Product moderation',ClipboardCheck),entry('/admin/properties','Property reports',HousePlus),entry('/admin/creative','Service moderation',Palette),entry('/admin/operations','Orders & accounts',ShoppingBag),entry('/admin/notifications','Notifications',Bell),entry('/admin/addresses','Addresses',MapPin)];
+  links.push(entry(`/${role}/payments`,role==='admin'?'Payments & Transactions':'Payments',Wallet));
+  return links.map(item=>({...item,group:
+    /\/(notifications|addresses|profile|help)$/.test(item.href)?'Account':
+    creative?(item.href.startsWith('/seller/creative')?'Creative Studio':'Workspaces'):
+    role==='seller'?(item.href.includes('/properties')||item.href==='/seller/creative'?'Workspaces':'Manage shop'):
+    role==='buyer'?(item.href.includes('/properties')||item.href==='/buyer/creative'?'Explore':'Shopping'):
+    item.href==='/admin/operations'||item.href==='/admin/payments'?'Management':'Moderation'}));
+}
+export function DashboardShell({ role,children,sectionsReady=true }: { role:'buyer'|'seller'|'admin';children:ReactNode;sectionsReady?:boolean }) {
+  const auth=useAuth(),navigate=useNavigate(),location=useLocation(),mobile=useMobileNavigation();
+  const creative=role==='seller'&&location.pathname==='/seller/creative';
+  const links=workspaceLinks(role,creative,sectionsReady);
+  const logout=<button className="btn btn-outline btn-sm logout-button" aria-label="Log out" title="Log out" onClick={()=>{auth.logout();navigate(role==='admin'?'/admin/login':`/login/${role}`,{replace:true});}}><LogOut size={20} aria-hidden="true"/><span className="nav-label">Log out</span></button>;
+  // Resolve anchors after asynchronous sections load, without stealing form focus on later renders.
+  useSectionTarget(children);
+  return <div className={`dash-shell ${role}${creative?' creative-studio':''}`}>
+    {mobile?<><header className="workspace-mobile-header"><Logo/><span className="workspace-context">{creative?'Creative Studio':role==='seller'?'Seller Studio':`${role} workspace`}</span></header><MobileNavigation items={links} role={role} creative={creative} accountControls={<><p className="session-identity">{auth.user?.name}</p>{logout}</>}/></>:<aside className="app-sidebar"><Logo light={role==='admin'}/><p className="eyebrow workspace-label">{creative?'Creative Studio':role==='seller'?'Seller Studio':`${role} workspace`}</p><SidebarLinks items={links} label="Workspace navigation"/><p className="session-identity">{auth.user?.name}</p>{logout}<Link className="back-home" to="/" aria-label="Back to marketplace" title="Back to marketplace"><House size={20} aria-hidden="true"/><span className="nav-label">Back to marketplace</span></Link></aside>}
+    <main id="main-content" tabIndex={-1}>{children}</main></div>;
 }
 export function PageTop({ eyebrow,title,action }: { eyebrow:string;title:string;action?:ReactNode }) { return <div className="page-top"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1></div>{action}</div>; }
 export function Metric({ label,value,note }: {label:string;value:string|number;note?:string}) { return <div className="metric"><span>{label}</span><strong>{value}</strong>{note&&<small>{note}</small>}</div>; }

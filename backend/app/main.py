@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes import admin, auth, health, orders, products, addresses, sellers, discovery
-from app.api.routes import notifications, properties, creative, product_images
+from app.api.routes import notifications, properties, creative, product_images, payments
 from app.api.errors import install_error_handlers
 from app.core.config import Settings
 
@@ -25,7 +25,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application = FastAPI(
         title="What Not? API", version="0.1.0",
-        description="Controlled-beta marketplace: Homemade orders, sale properties and Creative Services. Locality discovery; exact delivery eligibility at checkout. No payments are collected.",
+        description="Controlled-beta marketplace: Homemade orders, sale properties and Creative Services. Locality discovery; exact delivery eligibility at checkout. Direct COD/UPI records only; the platform does not process payments.",
         lifespan=lifespan,
         docs_url=None if settings.environment == 'production' else '/docs',
         redoc_url=None if settings.environment == 'production' else '/redoc',
@@ -53,7 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings.trusted_hosts:
         application.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts,
                                    www_redirect=False)
-    for router in (health.router, auth.router, products.router, orders.router, admin.router, addresses.router, sellers.router, discovery.router, notifications.router, properties.router, creative.router, product_images.router):
+    for router in (health.router, auth.router, products.router, orders.router, admin.router, addresses.router, sellers.router, discovery.router, notifications.router, properties.router, creative.router, product_images.router, payments.router):
         application.include_router(router, prefix="/api/v1")
     return application
 

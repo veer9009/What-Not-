@@ -1,0 +1,74 @@
+/* Seller-only presentation; existing palette, font and control tokens are retained. */
+.seller-payments { min-width: 0; }
+.seller-payments .page-top { margin-bottom: 8px; }
+.seller-payments .page-top > div { min-width: 0; }
+.seller-payments .page-top .btn { flex-shrink: 0; }
+.seller-payments-subtitle { margin: 0 0 24px; color: var(--muted); font-size: .9375rem; }
+.seller-payment-summary { margin-bottom: 24px; }
+.seller-payments-section-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.seller-payments-section-heading h2 { margin: 0; }
+.seller-payments-section-heading > span, .seller-payment-scope { color: var(--muted); font-size: .8125rem; }
+.seller-payment-scope { margin: 8px 0; }
+.seller-payment-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin: 16px 0 12px; }
+.seller-payment-metrics > div { min-width: 0; padding: 20px 16px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
+.seller-payment-metrics dt { display: flex; gap: 8px; align-items: center; font-size: .8125rem; color: var(--muted); }
+.seller-payment-metrics dt svg { flex-shrink: 0; }
+.seller-payment-metrics dd { margin: 12px 0 0; font-size: 1.375rem; font-weight: 700; overflow-wrap: anywhere; }
+.seller-payment-records > h2 { margin: 0 0 12px; }
+.seller-payment-state { padding: 24px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
+.seller-payment-state h3, .seller-payment-state p:first-child { margin-top: 0; }
+.seller-payment-state .btn { min-height: 44px; }
+.seller-payment-error { border-inline-start: 3px solid var(--muted); }
+.seller-payment-card-list { display: grid; gap: 12px; }
+.seller-payment-card { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); min-width: 0; }
+.seller-payment-card header { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 10px; }
+.seller-payment-card h3, .seller-payment-table h3 { font-size: .9375rem; line-height: 1.45; margin: 0; overflow-wrap: anywhere; }
+.seller-payment-card header h3 { max-width: 100%; }
+.seller-payments .payment-status { display: inline-block; max-width: 100%; border: 1px solid var(--line); border-radius: var(--radius-control); padding: 5px 8px; font-size: .75rem; font-weight: 600; }
+.seller-payment-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin: 20px 0 12px; }
+.seller-payment-facts > div:last-child { grid-column: 1 / -1; }
+.seller-payments dt { font-weight: 400; }
+.seller-payment-facts dt, .seller-record-details dt { color: var(--muted); font-size: .8125rem; }
+.seller-payment-facts dd, .seller-record-details dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.seller-record-amount { font-weight: 700; }
+.seller-record-details { margin: 12px 0; font-weight: 400; }
+.seller-record-details summary, .seller-payment-guidance > summary { min-height: 44px; cursor: pointer; align-content: center; font-size: .875rem; }
+.seller-record-details dl { margin: 8px 0; display: grid; gap: 12px; }
+.seller-payment-actions { display: grid; justify-items: start; gap: 12px; }
+.seller-payment-actions > .text-link { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; }
+.seller-payment-actions > p { font-size: .8125rem; margin: 0; }
+.seller-payment-actions .btn { min-height: 44px; white-space: normal; max-width: 100%; }
+.seller-payments .payment-confirmation { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--color-background); width: 100%; min-width: 0; }
+.seller-payments .payment-confirmation h3 { font-size: .9375rem; }
+.seller-payments .payment-confirmation p { font-size: .8125rem; overflow-wrap: anywhere; }
+.seller-payments .payment-confirmation .form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.seller-payment-table { width: 100%; table-layout: fixed; border-collapse: collapse; background: var(--paper); border: 1px solid var(--line); font-size: .8125rem; }
+.seller-payment-table th, .seller-payment-table td { text-align: left; vertical-align: top; padding: 16px 12px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.seller-payment-table thead { background: var(--color-background); }
+.seller-payment-table th:nth-child(1) { width: 16%; }
+.seller-payment-table th:nth-child(2) { width: 13%; }
+.seller-payment-table th:nth-child(3) { width: 12%; }
+.seller-payment-table th:nth-child(4) { width: 18%; }
+.seller-payment-table th:nth-child(5) { width: 20%; }
+.seller-payment-table th:nth-child(6) { width: 21%; }
+.seller-payment-table .payment-status { padding: 4px 6px; }
+.seller-payment-table .btn { padding: 8px; font-size: .8125rem; }
+.seller-payment-table .payment-confirmation { padding: 8px; }
+.seller-payment-table .seller-payment-review-row .payment-confirmation { max-width: 720px; margin-inline: auto; padding: 16px; }
+.seller-payment-card > .payment-confirmation { margin-top: 16px; }
+.seller-payment-guidance { margin-top: 24px; padding: 8px 16px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--paper); }
+.seller-payment-guidance > summary { font-weight: 600; }
+.seller-payment-guidance p { font-size: .875rem; }
+.seller-payments :is(summary,button,a):focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .seller-payments .page-top { flex-wrap: nowrap; align-items: center; gap: 8px; }
+  .seller-payments .page-top h1 { font-size: 1.75rem; }
+  .seller-payments .page-top .btn { padding: 10px; font-size: .8125rem; width: auto; }
+  .seller-payments-subtitle { margin-bottom: 20px; }
+  .seller-payment-metrics { grid-template-columns: minmax(0,1fr); gap: 8px; margin-block: 12px; }
+  .seller-payment-metrics > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; }
+  .seller-payment-metrics dt { max-width: 55%; }
+  .seller-payment-metrics dd { margin: 0; font-size: 1.125rem; text-align: right; }
+  .seller-payment-state { padding: 16px; }
+  .seller-payment-summary { margin-bottom: 20px; }
+}

@@ -29,13 +29,13 @@ export function OrderHistoryPage() {
   const load=useCallback(()=>ordersApi.list(offset),[offset]);
   const resource = useResource(load);
   return <DashboardShell role={role}>
-    <PageTop eyebrow="Order history" title={role === 'buyer' ? 'Your orders' : 'Incoming orders'}/>
-    <p className="approval-help">Newest orders first, 50 per page. No payment is collected.</p>
+    <PageTop eyebrow="Order history" title={role === 'buyer' ? 'Your orders' : 'Incoming orders'} action={<Link className="btn btn-outline" to={`/${role}/payments`}>View payments</Link>}/>
+    <p className="approval-help">Newest first, 50 per page. Pay the seller by COD or direct UPI; What Not? does not collect funds.</p>
     {resource.loading ? <Loading/> : resource.error ? <ErrorNotice message={resource.error} retry={() => void resource.reload()}/> : resource.data?.length ?
       <div className="resource-list">{resource.data.map(order => <article className="panel" key={order.id}>
         <h2>Order #{order.id}</h2><p>{statusLabel(order.status, role)}</p><p>₹{order.total}</p>
         <Link className="text-link" to={`/${role}/orders/${order.id}`}>View order {order.id}</Link>
-      </article>)}</div> : <EmptyState title="No orders yet" description="There are no orders on this page. Add nearby products to your cart to place an order."/>}
+      </article>)}</div> : <section><EmptyState title="No orders yet" description={role==='buyer'?'There are no orders on this page. Add nearby products to your cart to place an order.':'New customer orders will appear here. Keep your products active and in stock.'}/><Link className="btn btn-primary" to={role==='buyer'?'/buyer':'/seller'}>{role==='buyer'?'Explore nearby products':'Manage products'}</Link></section>}
     <div className="form-actions"><button className="btn btn-outline" disabled={offset===0||resource.loading} onClick={()=>setOffset(Math.max(0,offset-50))}>Previous orders</button><button className="btn btn-outline" disabled={resource.loading||(resource.data?.length??0)<50} onClick={()=>setOffset(offset+50)}>More orders</button></div>
   </DashboardShell>;
 }

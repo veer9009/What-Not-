@@ -22,18 +22,18 @@ function open(path = '/', role?: 'BUYER' | 'SELLER') {
 afterEach(() => { setAccessToken(null); vi.unstubAllGlobals(); });
 
 describe('What Not? business scope', () => {
-  it.each(['/', '/buyer'])('presents the three verticals and exact descriptions at %s', async path => {
+  it.each(['/', '/buyer'])('presents the three verticals and concise descriptions at %s', async path => {
     open(path, path === '/buyer' ? 'BUYER' : undefined);
-    const explore = await screen.findByRole('region', { name: 'Explore What Not?' });
+    const explore = await screen.findByRole('region', { name: path==='/'?'Explore What Not?':'Explore Nearby' });
     for (const [name, description] of [
-      ['Homemade', 'Discover homemade food, handmade products and local creations.'],
-      ['Real Estate', 'Discover local properties available for sale.'],
-      ['Creative Services', 'Find video editors, VFX artists and creative professionals.'],
+      ['Homemade', 'Homemade food, handmade products and crafts.'],
+      ['Real Estate', 'Local properties for sale.'],
+      ['Creative Services', 'Video editing, VFX and creative services.'],
     ]) {
       expect(within(explore).getByRole('heading', { name: path === '/' && name === 'Homemade' ? 'Homemade Products' : name })).toBeInTheDocument();
       expect(within(explore).getByText(description)).toBeInTheDocument();
     }
-    expect(within(explore).getByRole('link', { name: path === '/buyer' ? 'Explore nearby Homemade' : 'Explore Homemade samples' })).toHaveAttribute('href', path === '/buyer' ? '/buyer#homemade-catalogue' : '/buyer/samples#homemade-catalogue');
+    expect(within(explore).getByRole('link', { name: 'Explore nearby Homemade' })).toHaveAttribute('href', path === '/buyer' ? '/buyer#homemade-catalogue' : '/buyer');
   });
 
   it('links sale properties and creative work separately from product commerce', () => {
@@ -50,18 +50,16 @@ describe('What Not? business scope', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('exposes all verticals through the collapsible public navigation', async () => {
+  it('exposes all verticals through permanent accessible public navigation', async () => {
     open();
-    const toggle = screen.getByRole('button', { name: 'Toggle navigation' });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByRole('button', { name: 'Toggle navigation' })).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    for (const [name, id] of [['Homemade', 'homemade'], ['Real Estate', 'real-estate'], ['Creative Services', 'creative-services']]) {
+    for (const [name, id] of [['Homemade Products', 'homemade'], ['Real Estate', 'real-estate'], ['Creative Services', 'creative-services']]) {
       expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', `/#${id}`);
     }
     await userEvent.click(within(nav).getByRole('link', { name: 'Creative Services' }));
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(within(nav).getByRole('link',{name:'Creative Services'})).toHaveAttribute('aria-current','location');
+    expect(document.getElementById('creative-services')).toHaveFocus();
   });
 
   it('labels sample products individually and removes fabricated live trust claims', () => {

@@ -47,6 +47,6 @@ def test_revision_chain_has_one_head_and_no_missing_parents():
     config = Config()
     config.set_main_option('script_location', str(backend / 'alembic'))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ['0012']
+    assert scripts.get_heads() == ['0013']
     revisions = list(scripts.walk_revisions())
-    assert [revision.revision for revision in revisions] == [f'{value:04d}' for value in range(12, 0, -1)]
+    assert [revision.revision for revision in revisions] == [f'{value:04d}' for value in range(13, 0, -1)]

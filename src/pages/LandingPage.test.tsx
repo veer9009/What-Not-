@@ -1,8 +1,12 @@
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { LandingPage } from './LandingPage';
 import { DemoProvider } from '../state/DemoContext';
+
+const session=vi.hoisted(()=>({user:null as {role:'SELLER'|'ADMIN'}|null}));
+vi.mock('../state/AuthContext',()=>({useAuth:()=>session}));
+afterEach(()=>{session.user=null;});
 
 function open(){return render(<MemoryRouter><DemoProvider><LandingPage/></DemoProvider></MemoryRouter>);}
 
@@ -20,7 +24,7 @@ it('presents the approved neighborhood headline and supporting copy with a local
 it('keeps category and CTA destinations while clearly disclosing current beta limits',()=>{
   open();
   const categories=screen.getByRole('region',{name:'Explore What Not?'});
-  for(const [name,path] of [['Homemade Products','/buyer/samples#homemade-catalogue'],['Real Estate','/buyer/properties'],['Creative Services','/buyer/creative']]){
+  for(const [name,path] of [['Homemade Products','/buyer'],['Real Estate','/buyer/properties'],['Creative Services','/buyer/creative']]){
     const card=within(categories).getByRole('article',{name});
     expect(within(card).getByRole('link')).toHaveAttribute('href',path);
   }
@@ -29,6 +33,16 @@ it('keeps category and CTA destinations while clearly disclosing current beta li
   expect(screen.getByText(/Sample catalogue: geography/)).toBeInTheDocument();
   expect(screen.getByText(/Ownership and legal documents are not verified/)).toBeInTheDocument();
   expect(screen.getByText(/No payment or escrow is collected/)).toBeInTheDocument();
+});
+
+it.each(['SELLER','ADMIN'] as const)('labels category actions for their %s workspace destinations',role=>{
+  session.user={role};open();
+  const categories=screen.getByRole('region',{name:'Explore What Not?'});
+  const links=within(categories).getAllByRole('link');
+  expect(links.map(link=>link.textContent)).toEqual(role==='SELLER'
+    ?['Open Seller Studio ','Manage sale properties ','Open Creative Studio ']
+    :['Review Homemade listings ','Review sale properties ','Review Creative Services ']);
+  links.forEach(link=>expect(link.getAttribute('href')).toMatch(role==='SELLER'?/^\/seller/:/^\/admin/));
 });
 
 it('removes homepage food imagery without removing sample labels or sample product links',()=>{

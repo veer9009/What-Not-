@@ -210,6 +210,7 @@ footer, .legal-footer { background: var(--ink); }
 .whatsapp > span { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-control); padding: var(--space-2) var(--space-3); font-size: .875rem; }
 .whatsapp a { background: var(--color-primary); width: 48px; height: 48px; }
 @media (max-width: 1200px) {
+  .site:has(.public-sidebar) .radius-story { grid-template-columns: minmax(0, 1fr); }
   .product-grid, .buyer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dash-shell .vertical-grid { grid-template-columns: 1fr; }
   .dash-shell > main { padding: var(--space-6); }
@@ -278,4 +279,113 @@ footer, .legal-footer { background: var(--ink); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* Approved UX Step 1: navigation placement and responsive corrections only. */
+.workspace-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-3); margin-top: var(--space-6); padding-block: var(--space-3); }
+.workspace-pagination > span { text-align: center; }
+.workspace-pagination > button { flex: 0 1 auto; min-width: 0; }
+.payments-workspace { max-width: 1200px; }
+.payment-records { display: grid; gap: var(--space-4); margin-top: var(--space-6); }
+.payment-record { display: grid; gap: var(--space-4); }
+.payment-record .panel-head h2 { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.payment-record .panel-head h2 svg { flex-shrink: 0; }
+.payment-record :is(h3,p), .payment-facts { margin: 0; }
+.payment-facts, .payment-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-4); }
+.payment-facts > div, .payment-metrics > div { min-width: 0; }
+.payment-facts dt, .payment-metrics dt { color: var(--muted); }
+.payment-facts dd, .payment-metrics dd { margin: 0; overflow-wrap: anywhere; }
+.payment-metrics dd, .payment-amount { font-weight: 600; }
+.payment-status { background: var(--color-primary-soft); color: var(--color-primary-hover); border-radius: var(--radius-control); padding: var(--space-2); }
+.payment-help { margin-block: var(--space-4); }
+.payment-help summary { cursor: pointer; min-height: 44px; }
+.payment-help summary:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+.payments-workspace .checkbox-field { display: flex; align-items: flex-start; gap: var(--space-2); }
+.payments-workspace .checkbox-field input { width: 20px; height: 20px; flex-shrink: 0; }
+.payments-workspace .product-form :is(input:not([type="checkbox"]),select) { width: 100%; min-width: 0; }
+@media (max-width: 520px) {
+  .payment-facts, .payment-metrics { grid-template-columns: minmax(0,1fr); }
+  .workspace-pagination { justify-content: center; }
+  .workspace-pagination > span { flex: 1 0 100%; order: -1; }
+  .workspace-pagination > button { flex: 1 1 100%; }
+}
+:root { --navigation-width: 240px; }
+.site:has(.public-sidebar), .dash-shell { padding-left: var(--navigation-width); }
+.dash-shell { display: block; }
+#root:has(> .public-sidebar) > main { margin-left: var(--navigation-width); width: calc(100% - var(--navigation-width)); }
+#root:has(.app-sidebar) > .legal-footer,
+#root:has(.app-sidebar) > .whatsapp { margin-left: var(--navigation-width); }
+.app-sidebar, .dash-shell > .app-sidebar {
+  position: fixed; inset: 0 auto 0 0; z-index: 30;
+  width: var(--navigation-width); height: 100dvh; min-width: 0;
+  display: flex; flex-direction: column; align-items: stretch;
+  padding: var(--space-6) var(--space-4); gap: var(--space-2);
+  background: var(--paper); border-right: 1px solid var(--line);
+  overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;
+}
+.app-sidebar .workspace-label { margin: var(--space-4) var(--space-2); }
+.app-sidebar nav, .dash-shell > .app-sidebar nav {
+  display: grid; flex: 0 0 auto; gap: var(--space-1); margin: 0;
+  padding: 0; overflow: visible; max-width: 100%;
+}
+.app-sidebar nav a, .dash-shell > .app-sidebar nav a, .app-sidebar .back-home {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 44px; min-width: 0; padding: var(--space-3);
+  border-radius: var(--radius-control); white-space: normal;
+  font-size: .875rem; line-height: 1.4; color: var(--muted);
+}
+.app-sidebar svg { flex-shrink: 0; }
+.app-sidebar nav a.active, .app-sidebar nav a:hover { background: var(--color-primary-soft); color: var(--color-primary-hover); }
+.app-sidebar nav a:focus-visible { outline-offset: -3px; }
+.app-sidebar .session-identity { overflow-wrap: anywhere; margin: var(--space-4) var(--space-2) 0; }
+.app-sidebar .logout-button { flex-shrink: 0; }
+.app-sidebar .back-home { margin-top: auto; flex-shrink: 0; }
+.dash-shell > main { min-width: 0; }
+.dash-shell main :is(section, article, form, fieldset, label, .panel, .form-grid > *) { min-width: 0; }
+.dash-shell main :is(h1, h2, h3, p, a, button, small) { overflow-wrap: anywhere; }
+.dash-shell main :is(input, textarea, select) { max-width: 100%; }
+.dash-shell main button { min-height: 44px; max-width: 100%; white-space: normal; }
+.dash-shell .quantity button, .dash-shell .trash { min-width: 44px; }
+.dash-shell .row-actions { flex-wrap: wrap; align-items: center; }
+.dash-shell .row-actions :is(a, button) { width: auto; height: auto; min-height: 44px; max-width: 100%; padding: var(--space-2) var(--space-3); }
+.dash-shell :is(.form-actions, .filter-row, .property-nav, .panel-head, .price-row) { flex-wrap: wrap; }
+.dash-shell :is(.form-actions, .filter-row) > * { min-width: 0; max-width: 100%; }
+.creative-studio :is(#provider, #services, #portfolio, #enquiries, #quotations), #products { scroll-margin-top: var(--space-4); }
+.creative-studio .portfolio-links { display: grid; gap: var(--space-3); }
+.creative-studio .portfolio-links a { min-height: 44px; display: flex; align-items: center; gap: var(--space-2); }
+.creative-studio .panel form { display: grid; gap: var(--space-3); }
+.property-nav a { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; }
+/* Keep support reachable at the end of the page, clear of forms and the legal footer. */
+#root > .whatsapp { position: static; justify-content: flex-end; padding: var(--space-4); background: var(--color-background); }
+#root > .whatsapp > span { display: none; }
+@media (max-width: 1000px) {
+  :root { --navigation-width: 60px; }
+  .app-sidebar, .dash-shell > .app-sidebar { padding: var(--space-2) var(--space-1); gap: var(--space-2); }
+  .app-sidebar .nav-label, .app-sidebar .workspace-label, .app-sidebar .session-identity, .app-sidebar .logo > span:not(.logo-mark) {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .app-sidebar .logo { justify-content: center; flex-shrink: 0; }
+  .app-sidebar nav a, .dash-shell > .app-sidebar nav a, .app-sidebar .back-home, .app-sidebar .logout-button {
+    justify-content: center; width: 44px; min-height: 44px; padding: var(--space-2); margin-inline: auto;
+  }
+  .dash-shell > .app-sidebar .back-home { display: flex; }
+  .dash-shell > main { padding: var(--space-6) var(--space-4); }
+}
+@media (max-width: 520px) {
+  .dash-shell > main { padding: var(--space-4) var(--space-3); }
+  .dash-shell :is(.panel, .product-form > section, .order-card, .vertical-card) { padding: var(--space-3); }
+  .dash-shell .panel .panel { padding: var(--space-2); }
+  .dash-shell .form-actions { align-items: stretch; }
+  .dash-shell .form-actions > .btn { flex: 1 1 100%; }
+  .dash-shell .btn { padding-inline: var(--space-3); }
+  .dash-shell .metrics-grid { grid-template-columns: minmax(0, 1fr); }
+  .site:has(.public-sidebar) .section, .site:has(.public-sidebar) .how-section { padding: var(--space-8) var(--space-3); }
+  .neighborhood-home .neighborhood-category-heading { grid-template-columns: 40px minmax(0, 1fr); }
+  .neighborhood-home .neighborhood-category-heading > svg { display: none; }
+  .neighborhood-home .neighborhood-category-icon { width: 40px; height: 40px; }
+  .neighborhood-home .neighborhood-kicker { flex-wrap: wrap; }
+  .site:has(.public-sidebar) .public-header { padding-inline: var(--space-3); }
+  .site:has(.public-sidebar) .radius-story { padding-inline: var(--space-3); }
+  #root:has(> .public-sidebar) .community-login .login-form-wrap,
+  #root:has(> .public-sidebar) .community-login .login-discovery-panel { padding-inline: var(--space-3); }
 }

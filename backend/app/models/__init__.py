@@ -5,6 +5,7 @@ from app.models.product import Product
 from app.models.product_image import ProductImage
 from app.models.address import Address
 from app.models.order import Order
+from app.models.payment import OrderPayment
 from app.models.order_item import OrderItem
 from app.models.events import AuditEvent, Notification, EmailOutbox
 from app.models.abuse import RequestQuota

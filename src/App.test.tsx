@@ -77,7 +77,7 @@ describe('authenticated marketplace routes', () => {
     await userEvent.type(screen.getByLabelText('Email'), 'ravi@example.test');
     await userEvent.type(screen.getByLabelText('Password'), crypto.randomUUID());
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    await screen.findByText(`${role.toLowerCase()} workspace`);
+    await screen.findByText(role==='SELLER'?'Seller Studio':`${role.toLowerCase()} workspace`);
     expect(screen.queryByText('admin workspace')).not.toBeInTheDocument();
     expect(fetcher.mock.calls.some(([url]) => new URL(url, location.origin).pathname.startsWith('/api/v1/admin'))).toBe(false);
   });
@@ -104,7 +104,7 @@ describe('authenticated marketplace routes', () => {
   it.each(['BUYER','SELLER','ADMIN'])('routes by auth/me identity rather than chosen login role: %s', async role => {
     mockApi(path => path==='/auth/login' ? [200,{access_token:'test-token',expires_in:900,token_type:'bearer',user:account('BUYER')}] : path==='/auth/me' ? [200,account(role)] : path==='/sellers/me' ? [404,{}] : [200,[]]);
     open('/login/buyer'); await userEvent.type(screen.getByLabelText('Email address'),'ravi@example.test'); await userEvent.type(screen.getByLabelText('Password'),crypto.randomUUID()); await userEvent.click(screen.getByRole('button',{name:/sign in/i}));
-    await screen.findByRole('button',{name:/log out/i}); expect(screen.getByText(`${role.toLowerCase()} workspace`)).toBeInTheDocument();
+    await screen.findByRole('button',{name:/log out/i}); expect(screen.getByText(role==='SELLER'?'Seller Studio':`${role.toLowerCase()} workspace`)).toBeInTheDocument();
   });
   it.each([401,503])('reports login failure %s and clears the password', async status => { mockApi(() => [status,{detail:'private'}]); open('/login/buyer'); await userEvent.type(screen.getByLabelText('Email address'),'ravi@example.test'); await userEvent.type(screen.getByLabelText('Password'),crypto.randomUUID()); await userEvent.click(screen.getByRole('button',{name:/sign in/i})); await screen.findByRole('alert'); expect(screen.getByLabelText('Password')).toHaveValue(''); expect(getAccessToken()).toBeNull(); });
   it('highlights sanitized backend login validation errors',async()=>{
