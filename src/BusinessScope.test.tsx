@@ -11,7 +11,7 @@ function open(path = '/', role?: 'BUYER' | 'SELLER') {
     const path = new URL(input, location.origin).pathname;
     const body = path.endsWith('/auth/me')
       ? { id: 1, name: 'Ravi', email: 'ravi@example.test', role }
-      : path.endsWith('/sellers/me') ? { id: 2, shop_name: 'Ravi Studio' } : [];
+      : path.endsWith('/sellers/me') ? { id: 2, shop_name: 'Ravi Studio' } : path.endsWith('/wishlist') ? {items:[],count:0} : path.endsWith('/notifications/unread-count') ? {count:0} : [];
     return new Response(JSON.stringify(body), { status: 200 });
   });
   vi.stubGlobal('fetch', fetcher);
@@ -22,39 +22,40 @@ function open(path = '/', role?: 'BUYER' | 'SELLER') {
 afterEach(() => { setAccessToken(null); vi.unstubAllGlobals(); });
 
 describe('What Not? business scope', () => {
-  it.each(['/', '/buyer'])('presents the three verticals and concise descriptions at %s', async path => {
+  it.each(['/', '/buyer'])('presents four separate verticals and concise descriptions at %s', async path => {
     open(path, path === '/buyer' ? 'BUYER' : undefined);
     const explore = await screen.findByRole('region', { name: path==='/'?'Explore What Not?':'Explore Nearby' });
     for (const [name, description] of [
       ['Homemade', 'Homemade food, handmade products and crafts.'],
       ['Real Estate', 'Local properties for sale.'],
       ['Creative Services', 'Video editing, VFX and creative services.'],
+      ['Professional Services', 'Software, cloud and technical expertise.'],
     ]) {
-      expect(within(explore).getByRole('heading', { name: path === '/' && name === 'Homemade' ? 'Homemade Products' : name })).toBeInTheDocument();
+      const shortName=path==='/'?({ 'Creative Services':'Creative','Professional Services':'Professional'}[name]??name):name;
+      expect(within(explore).getByRole('heading', { name: shortName })).toBeInTheDocument();
       expect(within(explore).getByText(description)).toBeInTheDocument();
     }
     expect(within(explore).getByRole('link', { name: 'Explore nearby Homemade' })).toHaveAttribute('href', path === '/buyer' ? '/buyer#homemade-catalogue' : '/buyer');
   });
 
-  it('links sale properties and creative work separately from product commerce', () => {
+  it('links sale properties and creative work separately from product commerce', async () => {
     const fetcher = open();
-    const property = screen.getByRole('article', { name: 'Real Estate' });
+    const property = await screen.findByRole('article', { name: 'Real Estate' });
     const creative = screen.getByRole('article', { name: 'Creative Services' });
-    expect(within(property).getByText('Controlled beta')).toBeInTheDocument();
-    expect(within(creative).getByText('Controlled beta')).toBeInTheDocument();
+    expect(screen.getByText(/Controlled beta\. Homemade/)).toBeInTheDocument();
     expect(within(property).queryByText(/rental/i)).not.toBeInTheDocument();
     expect(within(property).getByRole('link')).toHaveAttribute('href','/buyer/properties');
-    expect(within(creative).getByRole('link')).toHaveAttribute('href','/buyer/creative');
-    expect(within(property).getByText(/legal documents are not verified/)).toBeInTheDocument();
-    expect(within(creative).getByText(/No payment or escrow/)).toBeInTheDocument();
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(within(creative).getByRole('link')).toHaveAttribute('href','/creative-services');
+    expect(screen.getByText(/legal documents are not verified/)).toBeInTheDocument();
+    expect(screen.getByText(/no payment or escrow/)).toBeInTheDocument();
+    expect(fetcher.mock.calls.every(([url])=>/\/(auth\/refresh|creative\/listings\?|properties\?)/.test(String(url)))).toBe(true);
   });
 
   it('exposes all verticals through permanent accessible public navigation', async () => {
     open();
     expect(screen.queryByRole('button', { name: 'Toggle navigation' })).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    for (const [name, id] of [['Homemade Products', 'homemade'], ['Real Estate', 'real-estate'], ['Creative Services', 'creative-services']]) {
+    for (const [name, id] of [['Marketplace', 'homemade'], ['Property', 'real-estate'], ['Creative Services', 'creative-services']]) {
       expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', `/#${id}`);
     }
     await userEvent.click(within(nav).getByRole('link', { name: 'Creative Services' }));
@@ -93,7 +94,8 @@ describe('What Not? business scope', () => {
     await userEvent.click(screen.getByRole('link', { name: /View cart/ }));
     expect(screen.getByRole('button', { name: 'Checkout unavailable' })).toBeDisabled();
     expect(screen.getByText(/Sample catalogue.*geography/)).toBeInTheDocument();
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher.mock.calls.filter(([url])=>String(url).endsWith('/auth/me'))).toHaveLength(1);
+    expect(fetcher.mock.calls.every(([url])=>/\/(auth\/me|notifications\/unread-count|wishlist)$/.test(String(url)))).toBe(true);
     expect(String(fetcher.mock.calls[0][0])).toMatch(/\/auth\/me$/);
   });
 

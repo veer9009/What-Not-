@@ -54,7 +54,7 @@ def test_property_expiry_is_bounded_notifies_once_and_preserves_confirmed_visits
 def test_readiness_checks_schema_and_reports_backlog_without_pii(auth_client):
     response = auth_client.get('/api/v1/ready')
     assert response.status_code == 200
-    assert response.json()['schema'] == '0013'
+    assert response.json()['schema'] == '0015'
     assert isinstance(response.json()['outbox_pending'], int)
     assert not any(word in response.text for word in ['password', 'email@', 'postgresql://'])
 

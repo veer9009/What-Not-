@@ -40,7 +40,11 @@ def product_response(product, settings=None):
 
 
 def order_response(order):
-    return OrderResponse(id=order.id, buyer_id=order.buyer_id, seller_id=order.seller_id,
+    from sqlalchemy.orm import object_session
+    from app.models.payment import OrderPayment
+    session=object_session(order)
+    payment=session.get(OrderPayment,order.id) if session else None
+    return OrderResponse(created_at=order.created_at,payment_method=payment.method if payment else None,id=order.id, buyer_id=order.buyer_id, seller_id=order.seller_id,
         status=order.status, subtotal=order.subtotal, delivery_fee=order.delivery_fee,
         delivered_at=order.delivered_at, confirmation_deadline=order.confirmation_deadline,
         completed_at=order.completed_at, completion_source=order.completion_source,

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from app.api.contracts import IdentifierPath
 from app.api.dependencies import Buyer, Seller, Admin, CurrentUser, TransactionSession
 from app.schemas.payment import MethodInput, ReportInput, ConfirmationInput, PaymentPage, PaymentView, PaymentMetrics
@@ -23,8 +23,8 @@ def payment(order_id:IdentifierPath,user:CurrentUser,session:TransactionSession)
 
 
 @router.post('/orders/{order_id}/method',response_model=PaymentView)
-def record_method(order_id:IdentifierPath,data:MethodInput,user:Buyer,session:TransactionSession):
-    return PaymentService(session).record_method(user.id,order_id,data)
+def record_method(order_id:IdentifierPath,data:MethodInput,user:Buyer,session:TransactionSession,request:Request):
+    return PaymentService(session,request.app.state.settings).record_method(user.id,order_id,data)
 
 
 @router.post('/orders/{order_id}/report',response_model=PaymentView)
@@ -35,3 +35,17 @@ def report(order_id:IdentifierPath,data:ReportInput,user:Buyer,session:Transacti
 @router.post('/orders/{order_id}/confirm',response_model=PaymentView)
 def confirm(order_id:IdentifierPath,data:ConfirmationInput,user:Seller,session:TransactionSession):
     return PaymentService(session).confirm(user.id,order_id,data)
+
+from app.services.payment_settings import PaymentSettingsService, SettingsInput, ReviewInput
+@router.get('/settings')
+def settings(user:Seller,session:TransactionSession,request:Request):return PaymentSettingsService(session,request.app.state.settings).get(user.id)
+@router.put('/settings')
+def update_settings(data:SettingsInput,user:Seller,session:TransactionSession,request:Request):return PaymentSettingsService(session,request.app.state.settings).put(user.id,data)
+@router.get('/admin/settings')
+def admin_settings(user:Admin,session:TransactionSession,request:Request):return PaymentSettingsService(session,request.app.state.settings).list(user.id)
+@router.post('/admin/settings/{seller_id}/review')
+def review_settings(seller_id:IdentifierPath,data:ReviewInput,user:Admin,session:TransactionSession,request:Request):return PaymentSettingsService(session,request.app.state.settings).review(user.id,seller_id,data)
+@router.get('/summary')
+def summary(user:CurrentUser,session:TransactionSession):return PaymentService(session).summary(user.id)
+@router.get('/orders/{order_id}/instructions')
+def instructions(order_id:IdentifierPath,user:CurrentUser,session:TransactionSession,request:Request):return PaymentService(session,request.app.state.settings).instructions(user.id,order_id)

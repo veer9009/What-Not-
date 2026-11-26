@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from typing import Annotated
 from sqlalchemy import inspect
 from decimal import Decimal
 from app.api.dependencies import Buyer, Seller, Admin, CurrentUser, TransactionSession
 from app.api.contracts import IdentifierPath
-from app.schemas.creative import ProviderInput, ListingInput, ModerationInput, RFQInput, ResponseInput, ReviewInput
+from app.schemas.creative import ProviderInput, ListingInput, ModerationInput, RFQInput, ResponseInput, ReviewInput, Domain, CATEGORIES
 from app.services.creative import CreativeService
 from app.models.creative import CreativeReview
 from sqlalchemy import select
@@ -18,13 +18,19 @@ def view(row):
     values = {column.key: getattr(row, column.key) for column in inspect(row).mapper.column_attrs}
     return {key: str(value) if isinstance(value, Decimal) else value for key, value in values.items()}
 
+def listing_filters(domain, q, category, remote):
+    if category is not None and category not in CATEGORIES[domain]:
+        raise HTTPException(status_code=422, detail='Category does not belong to this domain')
+    return dict(domain=domain, q=q, category=category, remote=remote)
+
 @router.get('/listings')
-def listings(session: TransactionSession, offset: Offset=0, limit: Limit=50):
-    return [view(row) for row in CreativeService(session).public_listings(offset=offset, limit=limit)]
+def listings(session: TransactionSession, offset: Offset=0, limit: Limit=50, domain: Domain='CREATIVE', q: str | None=None, category: str | None=None, remote: bool | None=None):
+    service = CreativeService(session)
+    return [service.listing_view(row) for row in service.public_listings(offset=offset, limit=limit, **listing_filters(domain, q, category, remote))]
 
 @router.get('/listings/mine')
-def own_listings(user: Seller, session: TransactionSession, offset: Offset=0, limit: Limit=50):
-    return [view(row) for row in CreativeService(session).own_listings(user.id, offset=offset, limit=limit)]
+def own_listings(user: Seller, session: TransactionSession, offset: Offset=0, limit: Limit=50, domain: Domain='CREATIVE', q: str | None=None, category: str | None=None, remote: bool | None=None):
+    return [view(row) for row in CreativeService(session).own_listings(user.id, offset=offset, limit=limit, **listing_filters(domain, q, category, remote))]
 
 @router.get('/provider')
 def provider(user: Seller, session: TransactionSession):
@@ -47,8 +53,16 @@ def resubmit(listing_id: IdentifierPath, user: Seller, session: TransactionSessi
     return view(CreativeService(session).resubmit(user.id, listing_id))
 
 @router.get('/admin/listings')
-def admin_listings(user: Admin, session: TransactionSession, offset: Offset=0, limit: Limit=50):
-    return [view(row) for row in CreativeService(session).admin_listings(user.id, offset=offset, limit=limit)]
+def admin_listings(user: Admin, session: TransactionSession, offset: Offset=0, limit: Limit=50, domain: Domain='CREATIVE', q: str | None=None, category: str | None=None, remote: bool | None=None):
+    return [view(row) for row in CreativeService(session).admin_listings(user.id, offset=offset, limit=limit, **listing_filters(domain, q, category, remote))]
+
+@router.get('/dashboard')
+def dashboard(user: Seller, session: TransactionSession, domain: Domain='CREATIVE'):
+    return CreativeService(session).dashboard(user.id, domain)
+
+@router.get('/reviews')
+def reviews(user: Seller, session: TransactionSession, domain: Domain='CREATIVE'):
+    return CreativeService(session).reviews(user.id, domain)
 
 @router.post('/admin/listings/{listing_id}/moderate')
 def moderate(listing_id: IdentifierPath, payload: ModerationInput, user: Admin, session: TransactionSession):
@@ -59,8 +73,8 @@ def create_rfq(listing_id: IdentifierPath, payload: RFQInput, user: Buyer, sessi
     return view(CreativeService(session).create_rfq(user.id, listing_id, payload))
 
 @router.get('/rfqs')
-def rfqs(user: CurrentUser, session: TransactionSession, offset: Offset=0, limit: Limit=50):
-    return [view(row) for row in CreativeService(session).list_rfqs(user.id, offset=offset, limit=limit)]
+def rfqs(user: CurrentUser, session: TransactionSession, offset: Offset=0, limit: Limit=50, domain: Domain='CREATIVE'):
+    return [view(row) for row in CreativeService(session).list_rfqs(user.id, offset=offset, limit=limit, domain=domain)]
 
 @router.get('/rfqs/{rfq_id}/responses')
 def responses(rfq_id: IdentifierPath, user: CurrentUser, session: TransactionSession):
@@ -75,8 +89,8 @@ def accept(response_id: IdentifierPath, user: Buyer, session: TransactionSession
     return view(CreativeService(session).accept(user.id, response_id))
 
 @router.get('/engagements')
-def engagements(user: CurrentUser, session: TransactionSession, offset: Offset=0, limit: Limit=50):
-    rows = CreativeService(session).engagements(user.id, offset=offset, limit=limit)
+def engagements(user: CurrentUser, session: TransactionSession, offset: Offset=0, limit: Limit=50, domain: Domain='CREATIVE'):
+    rows = CreativeService(session).engagements(user.id, offset=offset, limit=limit, domain=domain)
     ids = [row.id for row in rows]
     reviewed = set(session.scalars(select(CreativeReview.engagement_id).where(CreativeReview.engagement_id.in_(ids)))) if ids else set()
     return [dict(view(row), reviewed=row.id in reviewed) for row in rows]

@@ -17,7 +17,7 @@ def order_payload(db, records):
     records['product'].status = 'APPROVED'
     records['seller'].dispatch_location_confirmed_at = datetime.now(timezone.utc)
     db.flush()
-    return dict(seller_id=records['seller'].id, address_id=records['address'].id,
+    return dict(payment_method='COD',seller_id=records['seller'].id, address_id=records['address'].id,
                 items=[dict(product_id=records['product'].id, quantity=2, expected_unit_price='250.00')])
 
 

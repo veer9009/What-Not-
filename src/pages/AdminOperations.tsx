@@ -7,6 +7,7 @@ import { AdminReasonField, AdminWorkspace, useAdminConfirmation } from '../compo
 import { Loading, ErrorNotice } from '../components/ApiStates';
 import { orderStatusLabels } from '../components/OrderTracking';
 import { useResource } from '../state/useResource';
+import { useSearchParams } from 'react-router-dom';
 
 interface Account{id:string;name:string;email:string;phone:string;role:string;is_active:boolean;phone_verified_at?:string|null;email_verified_at?:string|null}
 interface Audit{id:string;actor_id:string|null;action:string;entity_type:string;entity_id:string;reason:string|null;created_at:string}
@@ -100,8 +101,11 @@ export function AdminOperationsPage(){
 
 export function CreativeModerationPage(){
   const [offset,setOffset]=useState(0);const [reason,setReason]=useState('');const [busy,setBusy]=useState(false);const pending=useRef(false);const [error,setError]=useState('');const [notice,setNotice]=useState('');
+  const [params]=useSearchParams();
+  const [domain,setDomain]=useState<'CREATIVE'|'PROFESSIONAL'>(()=>params.get('domain')==='PROFESSIONAL'?'PROFESSIONAL':'CREATIVE');
   const confirmation=useAdminConfirmation();const locked=busy||confirmation.pending;
-  const load=useCallback(()=>api<CreativeListing[]>(`/creative/admin/listings?offset=${offset}&limit=50`),[offset]);const resource=useResource(load);
+  const identity=`${domain}:${offset}`;
+  const load=useCallback(async()=>({identity:`${domain}:${offset}`,rows:await api<CreativeListing[]>(`/creative/admin/listings?offset=${offset}&limit=50&domain=${domain}`)}),[offset,domain]);const resource=useResource(load);
   async function moderate(listing:CreativeListing,status:string){
     if(pending.current)return;
     if(status!=='APPROVED'&&!reason.trim()){setError('Enter a rejection or takedown reason.');return;}
@@ -121,12 +125,13 @@ export function CreativeModerationPage(){
   }
   return <AdminWorkspace>
     <PageTop eyebrow="Creative Services" title="Service moderation"/>
+    <label>Service domain<select value={domain} disabled={locked} onChange={event=>{setDomain(event.target.value as 'CREATIVE'|'PROFESSIONAL');setOffset(0);setReason('');setNotice('');setError('');}}><option value="CREATIVE">Creative Services</option><option value="PROFESSIONAL">Professional Services</option></select></label>
     <p>Review service details and portfolio references before approving. Rejections and takedowns require a clear reason.</p>
     <AdminReasonField label="Rejection or takedown reason" helpId="service-reason-help" help="Required to reject or take down a service. Explain the issue so the provider understands the moderation decision." value={reason} disabled={locked} onChange={setReason}/>
     {error&&<ErrorNotice message={error}/ >}{notice&&<p className="success-note" role="status">{notice}</p>}
     {confirmation.content}
-    {resource.loading?<Loading/>:resource.error?<ErrorNotice message={resource.error} retry={()=>void resource.reload()}/>:resource.data?.length?
-      <div className="admin-record-grid">{resource.data.map(listing=><article className="panel admin-record" key={listing.id} aria-labelledby={`service-${listing.id}`}>
+    {resource.loading||(resource.data!==null&&resource.data.identity!==identity)?<Loading/>:resource.error?<ErrorNotice message={resource.error} retry={()=>void resource.reload()}/>:resource.data?.rows.length?
+      <div className="admin-record-grid">{resource.data.rows.map(listing=><article className="panel admin-record" key={listing.id} aria-labelledby={`service-${listing.id}`}>
         <header><h2 id={`service-${listing.id}`}>{listing.title}</h2><div className="admin-badges"><span className="admin-badge">{listing.status.replaceAll('_',' ')}</span><span className="admin-badge">{listing.category}</span></div></header>
         <p>{listing.description}</p>
         <dl className="admin-facts"><div><dt>Pricing</dt><dd>{listing.pricing.replaceAll('_',' ')} · {listing.amount??'Quotation'} INR</dd></div><div><dt>Location</dt><dd>{listing.remote?'Remote':listing.locality}</dd></div><div><dt>Provider</dt><dd>#{listing.provider_id}</dd></div></dl>
@@ -137,6 +142,6 @@ export function CreativeModerationPage(){
           {listing.status==='APPROVED'&&<button className="btn btn-danger" disabled={locked} onClick={()=>confirmModeration(listing,'TAKEN_DOWN')}>Take down {listing.title}</button>}
         </div>
       </article>)}</div>:<EmptyState title="No services on this page" description="No service listings were returned. Refresh or check another page."/>}
-    <nav className="admin-toolbar" aria-label="Service moderation pagination"><button className="btn btn-outline" disabled={locked||resource.loading||offset===0} onClick={()=>setOffset(Math.max(0,offset-50))}>Previous services</button><button className="btn btn-outline" disabled={locked||resource.loading||(resource.data?.length??0)<50} onClick={()=>setOffset(offset+50)}>More services</button><button className="btn btn-outline" disabled={locked||resource.loading} onClick={()=>void resource.reload()}>Refresh services</button></nav>
+    <nav className="admin-toolbar" aria-label="Service moderation pagination"><button className="btn btn-outline" disabled={locked||resource.loading||offset===0} onClick={()=>setOffset(Math.max(0,offset-50))}>Previous services</button><button className="btn btn-outline" disabled={locked||resource.loading||resource.data?.identity!==identity||(resource.data?.rows.length??0)<50} onClick={()=>setOffset(offset+50)}>More services</button><button className="btn btn-outline" disabled={locked||resource.loading} onClick={()=>void resource.reload()}>Refresh services</button></nav>
   </AdminWorkspace>;
 }

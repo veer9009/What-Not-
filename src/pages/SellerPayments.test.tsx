@@ -7,9 +7,9 @@ import { paymentsApi, type PaymentRecord } from '../api/payments';
 import { ApiError } from '../api/client';
 
 vi.mock('../state/AuthContext',()=>({useAuth:()=>({user:{role:'SELLER',id:'1',name:'Reviewer'},logout:vi.fn()})}));
-vi.mock('../api/payments',()=>({paymentsApi:{list:vi.fn(),metrics:vi.fn(),method:vi.fn(),report:vi.fn(),confirm:vi.fn()}}));
+vi.mock('../api/payments',()=>({paymentsApi:{summary:vi.fn(),list:vi.fn(),metrics:vi.fn(),method:vi.fn(),report:vi.fn(),confirm:vi.fn()}}));
 const record:PaymentRecord={order_id:'9007199254740993',seller_id:'2',seller_name:'Local maker',amount:'549.00',currency:'INR',order_status:'ACCEPTED',order_date:'2026-11-24T00:00:00Z',method:'UPI',status:'PENDING',reference:'REF-'+ 'A'.repeat(96),reported_at:null,confirmed_at:null,can_select_method:false,can_report:false,can_confirm:true};
-beforeEach(()=>{vi.mocked(paymentsApi.list).mockResolvedValue({items:[record],has_more:false});});
+beforeEach(()=>{vi.mocked(paymentsApi.summary).mockResolvedValue({currency:'INR',order_value:'10000.00',confirmed_collections:'5000.00',pending_cod_collections:'3000.00',upi_awaiting_verification:'2000.00',platform_revenue:'0.00',scope:'ALL_OWNED_ORDERS'});vi.mocked(paymentsApi.list).mockResolvedValue({items:[record],has_more:false});});
 afterEach(()=>{vi.clearAllMocks();vi.unstubAllGlobals();});
 function open(){render(<MemoryRouter><PaymentsPage/></MemoryRouter>);}
 function summary(){return screen.getByRole('region',{name:'Payment summary on this page'});}
@@ -125,4 +125,17 @@ it('provides a useful empty method filter and resets to all loaded payments',asy
   fireEvent.click(screen.getByRole('button',{name:'Show all payments'}));
   expect(screen.getByRole('heading',{name:'Order #9007199254740993'})).toBeInTheDocument();
   expect(within(summary()).getAllByText('INR 549.00')).toHaveLength(2);
+});
+it('shows server account totals separately from the loaded page and refreshes both',async()=>{
+ open();const account=await screen.findByRole('region',{name:'All owned orders payment summary'});await within(account).findByText('INR 10000.00');expect(within(account).getByText('INR 5000.00')).toBeInTheDocument();expect(within(account).getByText('INR 3000.00')).toBeInTheDocument();expect(within(account).getByText('INR 2000.00')).toBeInTheDocument();expect(within(account).getByText('INR 0.00')).toBeInTheDocument();
+ expect(within(summary()).getAllByText('INR 549.00')).toHaveLength(2);const calls=vi.mocked(paymentsApi.summary).mock.calls.length;fireEvent.click(screen.getByRole('button',{name:'Refresh payments'}));await waitFor(()=>expect(paymentsApi.summary).toHaveBeenCalledTimes(calls+1));
+});
+it('filters pending COD, awaiting UPI verification and confirmed records on this page',async()=>{
+ vi.mocked(paymentsApi.list).mockResolvedValue({items:[{...record,order_id:'1',method:'COD'},{...record,order_id:'2',status:'BUYER_REPORTED'},{...record,order_id:'3',status:'SELLER_CONFIRMED',can_confirm:false},{...record,order_id:'4',method:'COD',order_status:'CANCELLED'}],has_more:false});open();await screen.findByRole('table',{name:'Payment records'});
+ fireEvent.click(screen.getByRole('button',{name:'Pending collection'}));expect(screen.getAllByRole('heading',{name:/Order #/})).toHaveLength(1);expect(screen.getByRole('heading',{name:'Order #1'})).toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Awaiting verification'}));expect(screen.getAllByRole('heading',{name:/Order #/})).toHaveLength(1);expect(screen.getByRole('heading',{name:'Order #2'})).toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Confirmed received'}));expect(screen.getAllByRole('heading',{name:/Order #/})).toHaveLength(1);expect(screen.getByRole('heading',{name:'Order #3'})).toBeInTheDocument();expect(paymentsApi.list).toHaveBeenCalledTimes(1);
+});
+it('explains an empty status filter and restores the loaded records',async()=>{
+ open();await screen.findByRole('table',{name:'Payment records'});fireEvent.click(screen.getByRole('button',{name:'Confirmed received'}));expect(screen.getByRole('heading',{name:'No matching payment records on this page'})).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Show all payments'}));expect(screen.getByRole('heading',{name:'Order #9007199254740993'})).toBeInTheDocument();
 });

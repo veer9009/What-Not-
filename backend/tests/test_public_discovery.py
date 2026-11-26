@@ -55,8 +55,8 @@ def test_unset_public_point_excluded():
 
 def test_readiness_accepts_new_schema():
     from app.api.routes.health import readiness
-    values=iter(['0013',0,0,None])
-    assert readiness(SimpleNamespace(scalar=lambda statement:next(values)))['schema']=='0013'
+    values=iter(['0015',0,0,None])
+    assert readiness(SimpleNamespace(scalar=lambda statement:next(values)))['schema']=='0015'
 
 
 def test_readiness_rejects_old_schema():

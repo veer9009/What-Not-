@@ -19,19 +19,17 @@ export function AddressPage(){
 }
 function AddressForm({address,busy,fields,save,cancel}:{address?:Address;busy:boolean;fields:Record<string,string>;save:(body:AddressInput)=>Promise<void>;cancel:()=>void}){
   const [form,setForm]=useState<AddressInput>(address?Object.fromEntries(Object.keys(blank).map(key=>[key,address[key as keyof AddressInput]])) as unknown as AddressInput:{...blank});
-  const [locating,setLocating]=useState(false),[advanced,setAdvanced]=useState(false);
+  const [locating,setLocating]=useState(false);
+  const [locationConfirmed,setLocationConfirmed]=useState(false);
   const [locationError,setLocationError]=useState(''),[locationStatus,setLocationStatus]=useState('');
   const acquisition=useRef<AbortController|null>(null);
   useEffect(()=>()=>{acquisition.current?.abort();acquisition.current=null;},[]);
   const inputs=[['label','Label',80],['address_line1','Address line 1',255],['address_line2','Address line 2',255],['city','City',120],['state','State',120],['pincode','PIN code',20]] as const;
-  function editCoordinate(key:'latitude'|'longitude',value:string){
-    acquisition.current?.abort();acquisition.current=null;setLocating(false);
-    setLocationError('');setLocationStatus('');setForm(current=>({...current,[key]:value}));
-  }
+  const postalChanged=(['address_line1','address_line2','city','state','pincode'] as const).some(key=>(form[key]??'')!==(address?.[key]??''));
   async function locate(){
     if(busy||acquisition.current)return;
     const request=new AbortController();acquisition.current=request;
-    setLocating(true);setLocationError('');setLocationStatus('Detecting your current location...');
+    setLocating(true);setLocationConfirmed(false);setLocationError('');setLocationStatus('Detecting your current location...');
     try{
       const point=await acquireLocation(undefined,request.signal);
       if(acquisition.current!==request)return;
@@ -39,8 +37,8 @@ function AddressForm({address,busy,fields,save,cancel}:{address?:Address;busy:bo
       setLocationStatus(`Location detected. Review your postal details, then save your address.${point.accuracyMeters===null?' Browser accuracy is unavailable.':` Browser-reported accuracy: about ${Math.ceil(point.accuracyMeters)} m.`}`);
     }catch(reason){
       if(acquisition.current!==request)return;
-      setLocationStatus('');setAdvanced(true);
-      setLocationError(reason instanceof LocationError?reason.message:'Location is unavailable. Enter coordinates in Advanced location details.');
+      setLocationStatus('');
+      setLocationError(reason instanceof LocationError?reason.message:'Location is unavailable. Try again.');
     }finally{if(acquisition.current===request){acquisition.current=null;setLocating(false);}}
   }
   function submit(event:FormEvent<HTMLFormElement>){
@@ -48,7 +46,8 @@ function AddressForm({address,busy,fields,save,cancel}:{address?:Address;busy:bo
     try{
       if(!form.latitude.trim()||!form.longitude.trim())throw new LocationError('invalid');
       coordinates(Number(form.latitude),Number(form.longitude));
-    }catch{setAdvanced(true);setLocationError('Enter a valid latitude (-90 to 90) and longitude (-180 to 180), or use current location.');return;}
+    }catch{setLocationError('Use current location to set a delivery location before saving.');return;}
+    if(postalChanged&&!locationConfirmed){setLocationError('Confirm that the delivery location matches the postal address before saving.');return;}
     if(!event.currentTarget.reportValidity())return;
     setLocationError('');void save({...form,address_line2:form.address_line2?.trim()||null});
   }
@@ -57,14 +56,12 @@ function AddressForm({address,busy,fields,save,cancel}:{address?:Address;busy:bo
     <CollectionNotice label="Address">Postal details and coordinates support discovery and checkout. The assigned seller can request your name, phone and postal address during eligible fulfilment/dispute states. Historical orders retain address details. Saving this address does not confirm sharing your precise delivery point with a seller; review and optionally confirm it in each order's details.</CollectionNotice>
     <div className="address-location"><h3>Delivery location</h3><p>Use GPS to fill your location. Enter your postal address below; GPS does not fill street details or your PIN code.</p>
       <button type="button" className="btn btn-outline" disabled={busy||locating} onClick={()=>void locate()}><MapPin size={18}/>{locating?'Detecting location...':'Use Current Location'}</button>
+      {locating&&<button type="button" className="btn btn-outline" onClick={()=>{acquisition.current?.abort();acquisition.current=null;setLocating(false);setLocationStatus('Location request cancelled.');}}>Cancel location request</button>}
       {locationStatus&&<p role="status" className={locating?'approval-help':'success-note'}>{locationStatus}</p>}
       {locationError&&<ErrorNotice message={locationError}/>}
     </div>
-    <div className="form-grid address-postal-fields">{inputs.map(([key,label,length])=><Field key={key} label={label} name={key} value={form[key]??''} onChange={value=>setForm(current=>({...current,[key]:value}))} maxLength={length} required={key!=='address_line2'} error={fields[key]}/>)}</div>
-    <details className="address-advanced" open={advanced||Boolean(fields.latitude||fields.longitude)} onToggle={event=>setAdvanced(event.currentTarget.open)}>
-      <summary>Advanced location details</summary><p>Optional manual entry if GPS is unavailable or needs correction. A valid location is required to save this address.</p>
-      <div className="form-grid">{(['latitude','longitude'] as const).map(key=><Field key={key} label={key==='latitude'?'Latitude':'Longitude'} name={key} type="number" step="0.000001" min={key==='latitude'?-90:-180} max={key==='latitude'?90:180} value={form[key]} onChange={value=>editCoordinate(key,value)} error={fields[key]}/>)}</div>
-    </details>
+    <div className="form-grid address-postal-fields">{inputs.map(([key,label,length])=><Field key={key} label={label} name={key} value={form[key]??''} onChange={value=>{if(key!=='label'){acquisition.current?.abort();acquisition.current=null;setLocating(false);setLocationConfirmed(false);setLocationStatus('');setLocationError('');}setForm(current=>({...current,[key]:value}));}} maxLength={length} required={key!=='address_line2'} error={fields[key]}/>)}</div>
+    {postalChanged&&<label className="checkbox-field"><input type="checkbox" checked={locationConfirmed} onChange={event=>setLocationConfirmed(event.target.checked)}/>I confirm the delivery location matches this postal address. Use current location at the delivery address if the saved point is incorrect.</label>}
     <p className="approval-help">Select this saved address explicitly when discovering products or checking out. Your current device location may differ from the delivery address.</p>
     <label className="checkbox-field"><input type="checkbox" checked={form.is_default} onChange={event=>setForm(current=>({...current,is_default:event.target.checked}))}/>Default address</label>
     </section><div className="form-actions"><button className="btn btn-outline" type="button" disabled={busy} onClick={cancel}>Cancel</button><button className="btn btn-primary" disabled={busy||locating}>{busy?'Saving address...':'Save address'}</button></div></form>;

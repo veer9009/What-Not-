@@ -33,6 +33,9 @@ if '--check-createdb' in sys.argv:
 
 def guard_schema(connection, cursor, statement, parameters, context, executemany):
     url = connection.engine.url
+    if url.get_backend_name() == 'sqlite':
+        assert url.database in {None, '', ':memory:'}, 'Only in-memory SQLite fixtures are allowed'
+        return
     assert url.database == fixtures.TEST_DATABASE
     match = re.search(r'(?:^| )-csearch_path=(whatnot_refresh_test_[a-f0-9]{32})(?: |$)', url.query.get('options', ''))
     assert match is not None, 'Every test engine must name its generated schema'
@@ -79,7 +82,11 @@ class SchemaSelection:
     def pytest_addoption(self, parser):
         parser.addoption('--persistence-isolated-schema', action='store_true')
 
+targets=['tests/persistence']
+if '--all-tests' in sys.argv:
+    targets=['tests']
+    sys.argv.remove('--all-tests')
 try:
-    sys.exit(pytest.main(['tests/persistence', '--persistence-isolated-schema', '-q', '--tb=short', *sys.argv[1:]], plugins=[sys.modules[__name__], SchemaSelection()]))
+    sys.exit(pytest.main([*targets, '--persistence-isolated-schema', '-q', '--tb=short', *sys.argv[1:]], plugins=[sys.modules[__name__], SchemaSelection()]))
 finally:
     event.remove(Engine, 'before_cursor_execute', guard_schema)

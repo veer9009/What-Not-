@@ -7,14 +7,28 @@ const logout=vi.fn();
 vi.mock('../state/AuthContext',()=>({useAuth:()=>({user:{id:'1',name:'Reviewer',role:'SELLER'},logout})}));
 afterEach(()=>{cleanup();vi.clearAllMocks();});
 
+it('separates the professional provider workspace and never offers it to buyers or admins',()=>{
+  const view=render(<MemoryRouter initialEntries={['/seller/professional#services']}><DashboardShell role="seller"><h1>Technical work</h1></DashboardShell></MemoryRouter>);
+  const nav=screen.getByRole('navigation',{name:'Workspace navigation'});
+  expect(screen.getByText('Professional Dashboard',{selector:'.workspace-label'})).toBeInTheDocument();
+  expect(within(nav).getByRole('link',{name:'Services'})).toHaveAttribute('href','/seller/professional#services');
+  expect(within(nav).getByRole('link',{name:'Services'})).toHaveAttribute('aria-current','location');
+  expect(within(nav).getByRole('link',{name:'Creative Studio'})).toHaveAttribute('href','/seller/creative');
+  expect(within(nav).getByRole('link',{name:'Projects'})).toHaveAttribute('href','/seller/professional#projects');
+  view.unmount();
+  render(<MemoryRouter initialEntries={['/buyer/professional']}><DashboardShell role="buyer"><h1>Technical services</h1></DashboardShell></MemoryRouter>);
+  expect(screen.getByRole('link',{name:'Professional Services'})).toHaveAttribute('href','/buyer/professional');
+  expect(document.querySelector('a[href="/seller/professional"]')).not.toBeInTheDocument();
+});
+
 it('exposes public destinations as accessible icon links without a hamburger',()=>{
   render(<MemoryRouter initialEntries={['/#real-estate']}><PublicHeader/></MemoryRouter>);
   const nav=screen.getByRole('navigation',{name:'Main navigation'});
-  for(const label of ['Home','Homemade Products','Real Estate','Creative Services','Become a Seller','Login']){
+  for(const label of ['Home','Marketplace','Property','Creative Services','Become a Seller','Login']){
     const link=within(nav).getByRole('link',{name:label});
     expect(link.querySelector('svg')).toHaveAttribute('aria-hidden','true');
   }
-  expect(within(nav).getByRole('link',{name:'Real Estate'})).toHaveAttribute('aria-current','location');
+  expect(within(nav).getByRole('link',{name:'Property'})).toHaveAttribute('aria-current','location');
   expect(within(nav).getAllByRole('link').filter(a=>a.hasAttribute('aria-current'))).toHaveLength(1);
   expect(screen.queryByRole('button',{name:'Toggle navigation'})).not.toBeInTheDocument();
 });
@@ -55,13 +69,13 @@ it('keeps seller products and existing delivery controls reachable without chang
 
 it('moves keyboard focus to a public category when its sidebar link is selected',()=>{
   render(<MemoryRouter><PublicHeader/><main><section id="real-estate"><h2>Sale properties</h2></section></main></MemoryRouter>);
-  fireEvent.click(within(screen.getByRole('navigation',{name:'Main navigation'})).getByRole('link',{name:'Real Estate'}));
+  fireEvent.click(within(screen.getByRole('navigation',{name:'Main navigation'})).getByRole('link',{name:'Property'}));
   expect(document.getElementById('real-estate')).toHaveFocus();
 });
 
 it('returns to the selected section when its same sidebar link is activated again',()=>{
   render(<MemoryRouter><PublicHeader/><main><section id="real-estate"><h2>Sale properties</h2></section><button>Elsewhere</button></main></MemoryRouter>);
-  const link=within(screen.getByRole('navigation',{name:'Main navigation'})).getByRole('link',{name:'Real Estate'});
+  const link=within(screen.getByRole('navigation',{name:'Main navigation'})).getByRole('link',{name:'Property'});
   fireEvent.click(link);
   screen.getByRole('button',{name:'Elsewhere'}).focus();
   fireEvent.click(link);
@@ -80,7 +94,7 @@ it('restores Home scroll and focus on repeated selection and browser history nav
   function History(){const navigate=useNavigate();return <><button onClick={()=>navigate(-1)}>Back</button><button onClick={()=>navigate(1)}>Forward</button></>;}
   render(<MemoryRouter><PublicHeader/><main id="main-content" tabIndex={-1}><section id="real-estate">Properties</section><History/></main></MemoryRouter>);
   const nav=screen.getByRole('navigation',{name:'Main navigation'});
-  fireEvent.click(within(nav).getByRole('link',{name:'Real Estate'}));
+  fireEvent.click(within(nav).getByRole('link',{name:'Property'}));
   expect(document.getElementById('real-estate')).toHaveFocus();
   fireEvent.click(within(nav).getByRole('link',{name:'Home'}));
   expect(document.getElementById('main-content')).toHaveFocus();

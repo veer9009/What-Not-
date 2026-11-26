@@ -50,7 +50,7 @@ it('sets up profile, dispatch and explicitly shared discovery in one save, witho
   vi.stubGlobal('navigator', {geolocation:{getCurrentPosition:gps}});
   await profile();
   expect(gps).not.toHaveBeenCalled();
-  expect(screen.getByText('Enter coordinates manually')).toHaveProperty('tagName', 'SUMMARY');
+  expect(screen.queryByLabelText('Latitude')).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Shop name'), {target:{value:'Maker'}});
   fireEvent.change(screen.getByLabelText('Phone'), {target:{value:'100'}});
   fireEvent.click(screen.getByRole('button', {name:'Use Current Location'}));
@@ -79,7 +79,9 @@ it('requires explicit dispatch confirmation and never publishes a private point 
 it('clears draft confirmations when the selected shop location changes', async () => {
   current = {...saved, dispatch_location_confirmed_at:null, public_discovery_confirmed_at:null};
   await profile(); consent();
-  fireEvent.change(screen.getByLabelText('Latitude'), {target:{value:'20'}});
+  vi.stubGlobal('navigator',{geolocation:{getCurrentPosition:(success:PositionCallback)=>success({coords:{latitude:20,longitude:72,accuracy:10}} as GeolocationPosition)}});
+  fireEvent.click(screen.getByRole('button',{name:'Use Current Location'}));
+  await screen.findByText(/Shop location selected/i);
   expect(screen.getByRole('checkbox', {name:/I confirm this is where I send products from/i})).not.toBeChecked();
   expect(screen.getByRole('checkbox', {name:/I agree to use this point for public discovery/i})).not.toBeChecked();
   submit(); expect(await screen.findByRole('alert')).toHaveTextContent(/confirm.*send products/i);
@@ -90,8 +92,9 @@ it('retries partial first-time setup without creating another shop or confirming
   current = null; await profile();
   fireEvent.change(screen.getByLabelText('Shop name'), {target:{value:'Maker'}});
   fireEvent.change(screen.getByLabelText('Phone'), {target:{value:'100'}});
-  fireEvent.change(screen.getByLabelText('Latitude'), {target:{value:'19'}});
-  fireEvent.change(screen.getByLabelText('Longitude'), {target:{value:'72'}});
+  vi.stubGlobal('navigator',{geolocation:{getCurrentPosition:(success:PositionCallback)=>success({coords:{latitude:19,longitude:72,accuracy:10}} as GeolocationPosition)}});
+  fireEvent.click(screen.getByRole('button',{name:'Use Current Location'}));
+  await screen.findByText(/Shop location selected/i);
   consent(); vi.mocked(setPublicDiscovery).mockRejectedValueOnce(new ApiError(503,'Unavailable'));
   submit(); expect(await screen.findByRole('alert')).toHaveTextContent(/profile was saved/i);
   submit(); await waitFor(() => expect(setPublicDiscovery).toHaveBeenCalledTimes(2));
@@ -108,7 +111,9 @@ it('keeps saved confirmation and public consent for an ordinary profile edit', a
 it('shows revoked public consent after a partial move and retains a safe retry', async () => {
   await profile();
   expect(screen.getByText('Public discovery point confirmed.')).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText('Latitude'), {target:{value:'20'}});
+  vi.stubGlobal('navigator',{geolocation:{getCurrentPosition:(success:PositionCallback)=>success({coords:{latitude:20,longitude:72,accuracy:10}} as GeolocationPosition)}});
+  fireEvent.click(screen.getByRole('button',{name:'Use Current Location'}));
+  await screen.findByText(/Shop location selected/i);
   fireEvent.click(screen.getByRole('checkbox', {name:/I confirm this is where I send products from/i}));
   vi.mocked(setDispatchLocation).mockRejectedValueOnce(new ApiError(503,'Unavailable'));
   submit();

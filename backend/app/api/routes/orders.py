@@ -28,9 +28,9 @@ def list_orders(user: OrderActor, session: TransactionSession, offset: int = Que
 def create_order(payload: OrderCreate, user: Buyer, session: TransactionSession, request: Request,
                  idempotency_key: Annotated[UUID4, Header(alias='Idempotency-Key')]) -> OrderResponse:
     placement = OrderPlacement(buyer_id=user.id, address_id=payload.address_id,
-                               seller_id=payload.seller_id, items=payload.items, idempotency_key=idempotency_key)
+                               seller_id=payload.seller_id, items=payload.items, payment_method=payload.payment_method, idempotency_key=idempotency_key)
     return order_response(OrderService(session, settings=request.app.state.settings,
-        require_price_confirmation=True).create(placement))
+        require_price_confirmation=True,require_payment_method=True).create(placement))
 
 
 @router.get("/{order_id}", response_model=OrderResponse, description='Read an order only as its owning buyer or seller.')

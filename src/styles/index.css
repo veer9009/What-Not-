@@ -136,7 +136,7 @@
 .hero-collage{height:440px}
 .hero-scope,.verticals-intro{color:var(--color-text-muted);font-size:.9rem;line-height:1.7}
 .verticals-intro{margin:.8rem 0 0;max-width:640px}
-.vertical-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.25rem}
+.vertical-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem}
 .vertical-card{display:flex;flex-direction:column;min-width:0;padding:1.75rem;background:var(--color-surface);border:1px solid var(--color-border);border-radius:20px;box-shadow:var(--shadow);scroll-margin-top:24px}
 .vertical-card-top{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:1.75rem;color:var(--color-primary)}
 .vertical-card-top>svg{flex-shrink:0}
@@ -208,3 +208,12 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px soli
 .skip-link:focus{transform:none}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
 @media(max-width:760px){.public-role-grid{grid-template-columns:1fr}}
+@media (max-width: 420px) {
+  .public-header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 68px;
+    gap: .5rem;
+    padding-block: .75rem;
+  }
+}

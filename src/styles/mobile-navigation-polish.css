@@ -1,0 +1,25 @@
+.mobile-bottom-nav.polished-mobile-navigation {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  background: #fff;
+  box-shadow: 0 -4px 24px #253b3210;
+  border-top: 1px solid #e9eeea;
+  padding-top: 5px;
+}
+.polished-mobile-navigation :is(a, button) { min-width: 0; letter-spacing: 0; }
+.polished-mobile-navigation .mobile-create-action { overflow: visible; gap: 2px; }
+.polished-mobile-navigation .mobile-create-icon {
+  display: grid; place-items: center; width: 42px; height: 36px;
+  border-radius: 13px; background: var(--color-primary, #31745b); color: white;
+  box-shadow: 0 3px 8px #31745b24;
+}
+.polished-mobile-navigation .mobile-create-action[aria-expanded="true"] .mobile-create-icon { background: var(--color-primary-hover, #235741); }
+.mobile-more-dialog.polished-mobile-dialog { box-sizing: border-box; width: 100%; max-width: 100vw; }
+.polished-mobile-dialog .more-heading > div { min-width: 0; }
+.polished-mobile-dialog .more-heading h2 { overflow-wrap: anywhere; }
+.polished-mobile-dialog .more-heading > button { flex-shrink: 0; }
+.polished-mobile-dialog nav a { min-width: 0; }
+.polished-mobile-dialog nav a svg { flex-shrink: 0; }
+.polished-mobile-dialog .mobile-create-guidance { color: var(--muted); line-height: 1.6; font-size: .9rem; margin: 0 0 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .polished-mobile-navigation *, .polished-mobile-dialog * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

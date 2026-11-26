@@ -10,6 +10,13 @@ from app.services.mappers import safe_product_image_url
 from app.schemas.public_discovery import PUBLIC_DISCOVERY_CONSENT_VERSION
 import math
 
+def has_current_public_consent(seller):
+    """Shared publication boundary for discovery and persisted saved products."""
+    return (seller.public_discovery_latitude is not None
+        and seller.public_discovery_longitude is not None
+        and seller.public_discovery_confirmed_at is not None
+        and seller.public_discovery_consent_version == PUBLIC_DISCOVERY_CONSENT_VERSION)
+
 
 def locality_center(latitude, longitude):
     # A stable ~1.1 km cell. All sellers in a cell have identical discovery
@@ -33,9 +40,7 @@ class DiscoveryService:
 
     def _eligible_view(self, product, location, radius_km=3):
         seller = product.seller
-        if (seller.public_discovery_latitude is None or seller.public_discovery_longitude is None
-                or seller.public_discovery_confirmed_at is None
-                or seller.public_discovery_consent_version != PUBLIC_DISCOVERY_CONSENT_VERSION):
+        if not has_current_public_consent(seller):
             return None
         try:
             public_distance = distance_km(location.latitude, location.longitude,
@@ -61,12 +66,15 @@ class DiscoveryService:
         query = DiscoveryQuery.model_validate(query)
         location = self._location(actor_id, query)
         results, eligible_count, after_id = [], 0, 0
+        needle = (query.q or '').strip().casefold()
         while True:
             batch = self.repository.discovery_candidates(after_id, 100)
             if not batch:
                 return results
             for product in batch:
                 view = self._eligible_view(product, location, query.radius_km)
+                if view is not None and needle and not any(needle in (value or '').casefold() for value in (view.name, view.description, view.shop_name)):
+                    continue
                 if view is not None:
                     if eligible_count >= query.offset:
                         results.append(view)

@@ -10,6 +10,8 @@ import { useResource } from '../state/useResource';
 import { useAuth } from '../state/AuthContext';
 import { supportUrl } from '../utils/support';
 import { deliveryDirections } from '../location/directions';
+import { OrderPaymentPanel, OrderReceipt } from '../components/OrderPaymentPanel';
+import type { PaymentRecord } from '../api/payments';
 
 // Suggestions for UX only. Every attempted transition is authorized by the service.
 const sellerActions: Partial<Record<OrderStatus, [OrderStatus, string][]>> = {
@@ -30,7 +32,7 @@ export function OrderHistoryPage() {
   const resource = useResource(load);
   return <DashboardShell role={role}>
     <PageTop eyebrow="Order history" title={role === 'buyer' ? 'Your orders' : 'Incoming orders'} action={<Link className="btn btn-outline" to={`/${role}/payments`}>View payments</Link>}/>
-    <p className="approval-help">Newest first, 50 per page. Pay the seller by COD or direct UPI; What Not? does not collect funds.</p>
+    <p className="approval-help">Newest first, 50 per page. COD is payable to the seller at delivery. Prepaid UPI remains disabled pending approvals; What Not? does not collect funds.</p>
     {resource.loading ? <Loading/> : resource.error ? <ErrorNotice message={resource.error} retry={() => void resource.reload()}/> : resource.data?.length ?
       <div className="resource-list">{resource.data.map(order => <article className="panel" key={order.id}>
         <h2>Order #{order.id}</h2><p>{statusLabel(order.status, role)}</p><p>₹{order.total}</p>
@@ -54,6 +56,7 @@ function OrderDetails({ id }: { id: string | undefined }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [fulfillment,setFulfillment]=useState<Fulfillment|null>(null);
+  const [payment,setPayment]=useState<PaymentRecord|null>(null);
 
   async function loadFulfillment(){
     if(pending.current||!id)return;
@@ -117,9 +120,9 @@ function OrderDetails({ id }: { id: string | undefined }) {
               {role==='seller'?(fulfillment.delivery_location_confirmed&&deliveryDirections(fulfillment.delivery_location)?
                 <><a className="btn btn-primary" href={deliveryDirections(fulfillment.delivery_location)!} target="_blank" rel="noopener noreferrer">Navigate to Buyer</a><p className="approval-help">Opens Google Maps with the buyer-confirmed destination.</p></>:
                 <p>Buyer-confirmed delivery coordinates are unavailable. Use the postal address and arrange delivery with the buyer.</p>):
-                <><p>Review the actual delivery point below. Confirming shares this saved point with the assigned seller during eligible fulfillment states for Google Maps navigation. No device location is collected.</p>
+                <><p>Check that the postal address above matches the delivery location you saved using GPS. This screen cannot show or verify that point. Confirming shares it with the assigned seller during eligible fulfillment states for Google Maps navigation. No device location is collected here.</p>
                   {deliveryDirections(fulfillment.delivery_location)?<>
-                    <p>Latitude: {fulfillment.delivery_location!.latitude}, longitude: {fulfillment.delivery_location!.longitude}</p>
+                    <p>Your saved address has a delivery location available.</p>
                     {fulfillment.delivery_location_confirmed?<p role="status">Delivery location confirmed for this order.</p>:
                       <button className="btn btn-primary" disabled={busy} onClick={()=>void confirmLocation()}>Confirm delivery location for seller navigation</button>}
                     <p>If this point is incorrect, contact the seller before delivery. Historical delivery fields cannot be edited; use a replacement address for future orders.</p>
@@ -129,6 +132,8 @@ function OrderDetails({ id }: { id: string | undefined }) {
           </section>}
         {order.items.map(item => <article key={item.product_id}><h3>{item.name}</h3><p>{item.quantity} × ₹{item.unit_price}</p></article>)}
         <p>Subtotal: ₹{order.subtotal}</p><p>Delivery fee: ₹{order.delivery_fee}</p><p><b>Total: ₹{order.total}</b></p>
+        <OrderPaymentPanel key={`${order.id}-${order.status}`} orderId={order.id} role={role} onLoaded={setPayment}/>
+        {payment&&<OrderReceipt order={order} payment={payment}/>}
         <div className="form-actions">{actions.map(([status, label]) => <button className="btn btn-primary" disabled={busy} key={status} onClick={() => void transition(status)}>{label}</button>)}</div>
         {role === 'buyer' && <div className="order-support"><a className="text-link" href={supportUrl(order.id)} target="_blank" rel="noreferrer">Need help with this order?</a><p>Chat with What Not Support on WhatsApp.</p></div>}
       </section>}

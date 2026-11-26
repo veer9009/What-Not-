@@ -31,7 +31,7 @@ def geographic_order(db, records):
     records['address'].longitude = Decimal('0.001')
     records['product'].status = 'APPROVED'
     db.flush()
-    return dict(seller_id=records['seller'].id, address_id=records['address'].id,
+    return dict(seller_id=records['seller'].id, address_id=records['address'].id, payment_method='COD',
                 items=[dict(product_id=records['product'].id, quantity=2, expected_unit_price='250.00')])
 
 

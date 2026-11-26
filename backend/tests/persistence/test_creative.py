@@ -5,6 +5,57 @@ from test_authentication import auth_client
 from test_authorization import bearer
 from test_service_concurrency import concurrency_engine, race_while_locked
 
+def test_professional_domain_is_isolated_and_dashboard_uses_real_records(auth_client, db, records):
+    from app.schemas.creative import ListingInput, ModerationInput
+    from app.models.user import User
+    from app.services.errors import PersistenceConflict
+    service, buyer, seller, creative, rfq, response = setup_flow(db, records)
+    values = dict(title='Website', description='Site', category='Website Development', pricing='QUOTATION', remote=True, domain='PROFESSIONAL')
+    listing = service.create_listing(seller, ListingInput(**values))
+    admin = db.scalar(select(User).where(User.role == 'ADMIN'))
+    service.moderate(admin.id, listing.id, ModerationInput(status='APPROVED', expected_updated_at=listing.updated_at))
+    with pytest.raises(PersistenceConflict):
+        service.update_listing(seller, listing.id, ListingInput(title='Changed', description='Site', category='Photography', pricing='QUOTATION', remote=True))
+    assert [x.id for x in service.public_listings(domain='PROFESSIONAL')] == [listing.id]
+    assert [x.id for x in service.public_listings()] == [creative.id]
+    assert auth_client.get('/api/v1/creative/listings?domain=PROFESSIONAL&category=Photography').status_code == 422
+    data = auth_client.get('/api/v1/creative/dashboard?domain=PROFESSIONAL', headers=bearer(seller)).json()
+    assert data == dict(active_services=1, pending_approvals=0, new_enquiries=0, submitted_quotations=0, ongoing_projects=0, completed_projects=0)
+    public = auth_client.get('/api/v1/creative/listings?domain=PROFESSIONAL').json()[0]
+    assert (public['provider_name'], public['provider_verification'], public['review_count'], public['rating_average']) == ('Studio', 'NOT_RECORDED', 0, None)
+    assert auth_client.get('/api/v1/creative/reviews?domain=PROFESSIONAL', headers=bearer(seller)).json() == []
+    from app.schemas.creative import RFQInput, ResponseInput, ReviewInput
+    professional_rfq = service.create_rfq(buyer, listing.id, RFQInput(brief='Build a website', request_key=uuid4()))
+    assert [item.id for item in service.list_rfqs(buyer, domain='PROFESSIONAL')] == [professional_rfq.id]
+    assert [item.id for item in service.list_rfqs(buyer)] == [rfq.id]
+    assert service.dashboard(seller, 'PROFESSIONAL')['new_enquiries'] == 1
+    quote = service.respond(seller, professional_rfq.id, ResponseInput(terms='Build', amount='400', request_key=uuid4()))
+    assert service.dashboard(seller, 'PROFESSIONAL')['submitted_quotations'] == 1
+    assert service.dashboard(seller, 'PROFESSIONAL')['new_enquiries'] == 0
+    engagement = service.accept(buyer, quote.id)
+    assert service.dashboard(seller, 'PROFESSIONAL')['ongoing_projects'] == 1
+    assert not service.engagements(buyer)
+    service.deliver(seller, engagement.id); service.complete(buyer, engagement.id)
+    service.review(buyer, engagement.id, ReviewInput(rating=4, text='Good'))
+    assert service.dashboard(seller, 'PROFESSIONAL')['completed_projects'] == 1
+    from app.models.events import Notification
+    events = list(db.scalars(select(Notification).where(Notification.entity_type == 'professional')))
+    assert {event.kind for event in events} == {'CREATIVE_MODERATION', 'CREATIVE_RFQ', 'CREATIVE_RESPONSE', 'CREATIVE_ACCEPTED', 'CREATIVE_DELIVERED', 'CREATIVE_COMPLETED'}
+    assert all('Professional Services' in event.body and event.event_key.startswith('creative:') for event in events)
+    assert db.scalar(select(Notification.id).where(Notification.entity_type == 'creative')) is not None
+    result = auth_client.get('/api/v1/creative/reviews?domain=PROFESSIONAL', headers=bearer(seller)).json()[0]
+    assert result['comment'] == 'Good' and 'buyer_id' not in result
+    assert auth_client.get('/api/v1/creative/reviews?domain=PROFESSIONAL', headers=bearer(buyer)).status_code == 403
+    stranger = User(name='Other seller', email='other-domain@creative.test', phone='1119998899', password_hash='test', role='SELLER')
+    db.add(stranger); db.flush()
+    assert service.reviews(stranger.id, 'PROFESSIONAL') == []
+    assert service.dashboard(stranger.id, 'PROFESSIONAL')['completed_projects'] == 0
+    assert service.list_rfqs(stranger.id, domain='PROFESSIONAL') == []
+    other = service.create_listing(seller, ListingInput(**(values | {'title':'Mobile app', 'category':'Mobile Application Development'})))
+    service.moderate(admin.id, other.id, ModerationInput(status='APPROVED', expected_updated_at=other.updated_at))
+    public = auth_client.get('/api/v1/creative/listings?domain=PROFESSIONAL&q=web&remote=true&limit=1').json()[0]
+    assert public['id'] == listing.id and public['review_count'] == 1 and float(public['rating_average']) == 4
+
 
 def setup_flow(db, records):
     from app.schemas.creative import ProviderInput, ListingInput, ModerationInput, RFQInput, ResponseInput
@@ -199,11 +250,11 @@ def test_cross_actor_delivery_and_confirmation_do_not_deadlock_on_recipient_fk(c
         engagement_id=service.accept(buyer_id,response.id).id
     delivering=Event();buyer_locked=Event()
     original=CreativeService._event
-    def pause_delivery(self,recipient,key,kind,id,title):
+    def pause_delivery(self,recipient,key,kind,id,title,domain='CREATIVE'):
         if kind=='CREATIVE_DELIVERED':
             delivering.set()
             assert buyer_locked.wait(10),'Confirmation must hold its actor lock'
-        return original(self,recipient,key,kind,id,title)
+        return original(self,recipient,key,kind,id,title,domain)
     monkeypatch.setattr(CreativeService,'_event',pause_delivery)
     def deliver():
         with Session(engine) as session,session.begin():

@@ -17,6 +17,8 @@ class Settings(BaseSettings):
         hide_input_in_errors=True,
     )
     environment: Literal["development", "test", "production"] = "development"
+    prepaid_upi_enabled: bool = False
+    approved_refund_policy_reference: str | None = None
     image_storage: Literal['local', 's3'] = 'local'
     image_local_directory: Path = Path(__file__).resolve().parents[2] / '.private-product-images'
     image_s3_bucket: str | None = None

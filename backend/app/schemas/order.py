@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 from datetime import datetime
 
 from pydantic import Field, model_validator
@@ -28,6 +29,7 @@ class OrderItem(ContractModel):
 class OrderCreate(ContractModel):
     """One seller per request; identity, pricing and inventory are server-owned."""
 
+    payment_method: Literal['COD','UPI'] | None = None
     seller_id: DatabaseId
     address_id: DatabaseId
     items: list[OrderItem] = Field(min_length=1)
@@ -47,6 +49,8 @@ class OrderItemResponse(OrderItem):
 
 
 class OrderResponse(ContractModel):
+    created_at: datetime | None = None
+    payment_method: Literal['COD','UPI'] | None = None
     id: DatabaseId
     buyer_id: DatabaseId
     seller_id: DatabaseId

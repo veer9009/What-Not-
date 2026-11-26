@@ -12,6 +12,22 @@ from app.services.errors import OwnershipError, PersistenceConflict
 from test_authentication import auth_client
 from test_authorization import bearer
 
+@pytest.fixture(autouse=True)
+def simulated_upi_policy(monkeypatch,db,records,request):
+    """Only isolated test records may exercise simulated prepaid UPI."""
+    from app.core.config import Settings
+    from app.models.shopping import SellerPaymentSettings
+    settings=Settings(_env_file=None,environment='test',prepaid_upi_enabled=True,
+        approved_refund_policy_reference='SIMULATED-TEST-POLICY-ONLY')
+    monkeypatch.setattr('app.core.config.Settings',lambda **kwargs:settings)
+    db.add(SellerPaymentSettings(seller_id=records['seller'].id,upi_id='synthetic@example',
+        account_holder_name='Synthetic test seller',accept_cod=True,accept_upi=True,verification_status='APPROVED'))
+    db.flush()
+    if 'auth_client' in request.fixturenames:
+        client=request.getfixturevalue('auth_client')
+        client.app.state.settings.prepaid_upi_enabled=True
+        client.app.state.settings.approved_refund_policy_reference='SIMULATED-TEST-POLICY-ONLY'
+
 
 def method(service, records, value='UPI'):
     return service.record_method(records['buyer'].id, records['order'].id, MethodInput(method=value))

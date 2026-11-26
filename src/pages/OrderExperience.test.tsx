@@ -1,0 +1,22 @@
+import { render,screen,waitFor } from '@testing-library/react';
+import { MemoryRouter,Route,Routes } from 'react-router-dom';
+import { expect,it,vi } from 'vitest';
+import { OrderDetailsPage } from './OrderPages';
+import { ordersApi } from '../api/orders';
+import { paymentsApi } from '../api/payments';
+vi.mock('../components/Shared',()=>({DashboardShell:({children}:any)=><main>{children}</main>,PageTop:({title}:any)=><h1>{title}</h1>,EmptyState:()=>null}));
+vi.mock('../state/AuthContext',()=>({useAuth:()=>({user:{id:'1',name:'Buyer',role:'BUYER'}})}));
+vi.mock('../api/orders',()=>({ordersApi:{get:vi.fn(),transition:vi.fn()}}));
+vi.mock('../api/payments',()=>({paymentsApi:{get:vi.fn()}}));
+it('shows tracking, independent unpaid status and a real order receipt on the buyer order screen',async()=>{
+  vi.mocked(ordersApi.get).mockResolvedValue({id:'9',buyer_id:'1',seller_id:'2',status:'DELIVERED',subtotal:'250.00',delivery_fee:'0.00',total:'250.00',items:[{product_id:'4',seller_id:'2',name:'Fixture product',quantity:1,unit_price:'250.00'}]});
+  vi.mocked(paymentsApi.get).mockResolvedValue({order_id:'9',seller_id:'2',seller_name:'Fixture shop',amount:'250.00',currency:'INR',order_status:'DELIVERED',order_date:'2026-11-25T00:00:00Z',method:'COD',status:'PENDING',reference:null,reported_at:null,confirmed_at:null,can_select_method:false,can_report:false,can_confirm:false});
+  render(<MemoryRouter initialEntries={['/buyer/orders/9']}><Routes><Route path="/buyer/orders/:id" element={<OrderDetailsPage/>}/></Routes></MemoryRouter>);
+  await screen.findByRole('heading',{name:'Order progress'});
+  await screen.findByRole('heading',{name:'Order receipt'});
+  expect(screen.getByText('INR 250.00 payable on delivery')).toBeInTheDocument();
+  expect(screen.getByText('Fixture shop')).toBeInTheDocument();
+  expect(screen.getByText('Not proof of payment. This is not a tax invoice.')).toBeInTheDocument();
+  await waitFor(()=>expect(paymentsApi.get).toHaveBeenCalledWith('9'));
+  expect(ordersApi.transition).not.toHaveBeenCalled();
+});

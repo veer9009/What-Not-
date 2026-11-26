@@ -4,12 +4,12 @@ export interface Coordinates { latitude: number; longitude: number }
 export interface AcquiredLocation extends Coordinates { accuracyMeters: number | null }
 export type LocationErrorCode = 'denied' | 'unavailable' | 'timeout' | 'unsupported' | 'insecure' | 'invalid';
 const messages: Record<LocationErrorCode,string> = {
-  denied:'Location permission was denied. Allow location in your browser and device settings, then try again. You can also enter coordinates manually or select a saved address.',
-  unavailable:'Your position is unavailable. Check your device location settings and try again, or enter coordinates manually.',
-  timeout:'Location request timed out. Try again or enter coordinates manually.',
-  unsupported:'Browser geolocation is unavailable. Enter coordinates manually or select a saved address.',
-  insecure:'Current location requires HTTPS or localhost. Open the secure site, enter coordinates manually, or select a saved address.',
-  invalid:'Enter a valid latitude (-90 to 90) and longitude (-180 to 180).',
+  denied:'Location permission was denied. Allow location in your browser and device settings, then try again or select a saved address.',
+  unavailable:'Your position is unavailable. Check your device location settings and try again or select a saved address.',
+  timeout:'Location request timed out. Try again or select a saved address.',
+  unsupported:'Browser geolocation is unavailable. Select a saved address.',
+  insecure:'Current location requires HTTPS or localhost. Open the secure site or select a saved address.',
+  invalid:'The device returned an invalid location. Try again.',
 };
 export class LocationError extends Error {
   constructor(public code: LocationErrorCode) { super(messages[code]); this.name='LocationError'; }
@@ -43,7 +43,7 @@ export function acquireLocation(provider?: Pick<Geolocation,'getCurrentPosition'
           settled=true;cleanup();resolve({...point,accuracyMeters});
         } catch {fail(new LocationError('invalid'));}
       },error=>fail(new LocationError(error.code===1?'denied':error.code===3?'timeout':'unavailable')),
-      {enableHighAccuracy:true,timeout:10000,maximumAge:0});
+      {enableHighAccuracy:true,timeout:20000,maximumAge:0});
     } catch(error) {fail(new LocationError(error instanceof DOMException&&error.name==='SecurityError'?'denied':'unavailable'));}
   });
 }

@@ -3,6 +3,10 @@ from datetime import datetime
 from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, JSON, Numeric, String, Text, UniqueConstraint, true
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, IdMixin, TimestampMixin, CreatedMixin
+from app.schemas.creative import CATEGORIES
+
+def category_constraint():
+    return ' OR '.join("(domain='{}' AND category IN ({}))".format(domain, ','.join("'{}'".format(c.replace("'", "''")) for c in categories)) for domain, categories in CATEGORIES.items())
 
 class CreativeProvider(IdMixin, TimestampMixin, Base):
     __tablename__ = 'creative_providers'
@@ -16,11 +20,12 @@ class CreativeListing(IdMixin, TimestampMixin, Base):
         CheckConstraint("status IN ('PENDING','APPROVED','REJECTED','TAKEN_DOWN')", name='status'),
         CheckConstraint("pricing IN ('FIXED','STARTING','HOURLY','QUOTATION')", name='pricing'),
         CheckConstraint("(pricing='QUOTATION' AND amount IS NULL) OR (pricing<>'QUOTATION' AND amount IS NOT NULL AND amount>0)", name='amount'),
-        CheckConstraint("category IN ('Video Editing','Travel Video Editing','Influencer Reel Editing','VFX')", name='category'),
+        CheckConstraint(category_constraint(), name='category'),
         CheckConstraint("currency='INR'", name='currency'),
         CheckConstraint('remote OR locality IS NOT NULL', name='service_area'),
     )
     provider_id: Mapped[int] = mapped_column(ForeignKey('creative_providers.id', ondelete='RESTRICT'), index=True)
+    domain: Mapped[str] = mapped_column(String(12), default='CREATIVE', server_default='CREATIVE')
     title: Mapped[str] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(Text)
     category: Mapped[str] = mapped_column(String(40))

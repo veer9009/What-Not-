@@ -54,14 +54,13 @@ it('discovery explains checkout eligibility without showing private point distan
   vi.stubGlobal('fetch',vi.fn(async(input:string)=>{
     const path=new URL(input, location.origin).pathname;
     const data=path.endsWith('/auth/me')?{id:1,name:'Buyer',email:'buyer@example.com',role:'BUYER'}:
-      path.endsWith('/addresses')?[]:[{id:3,seller_id:2,name:'Nearby vase',description:'Clay',price:'10.00',stock_quantity:1,
+      path.endsWith('/addresses')?[]:path.endsWith('/wishlist')?{items:[],count:0}:path.endsWith('/unread-count')?{count:0}:[{id:3,seller_id:2,name:'Nearby vase',description:'Clay',price:'10.00',stock_quantity:1,
         category:'Crafts',delivery_radius_km:1,image_url:null,shop_name:'Maker',is_verified:false,delivery_eligibility:'CONFIRMED_AT_CHECKOUT'}];
     return new Response(JSON.stringify(data),{status:200});
   }));
   render(<MemoryRouter initialEntries={['/buyer']}><App/></MemoryRouter>);
-  await screen.findByLabelText('Latitude');
-  await userEvent.type(screen.getByLabelText('Latitude'),'19');
-  await userEvent.type(screen.getByLabelText('Longitude'),'72');
+  vi.stubGlobal('navigator',{geolocation:{getCurrentPosition:(success:PositionCallback)=>success({coords:{latitude:19,longitude:72,accuracy:10}} as GeolocationPosition)}});
+  await userEvent.click(await screen.findByRole('button',{name:'Use current location'}));
   await userEvent.click(screen.getByRole('button',{name:'Use for discovery'}));
   expect(await screen.findByText('Nearby vase')).toBeInTheDocument();
   expect(screen.getAllByText(/delivery.*confirm.*checkout/i).length).toBeGreaterThan(0);

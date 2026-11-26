@@ -1,0 +1,32 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, expect, it, vi } from 'vitest';
+import { SellerPaymentSettingsPage, AdminPaymentSettingsPage } from './PaymentSettingsPages';
+import { paymentSettingsApi } from '../api/paymentSettings';
+vi.mock('../components/Shared',()=>({DashboardShell:({children}:any)=><main>{children}</main>,PageTop:({title}:any)=><h1>{title}</h1>}));
+vi.mock('../api/paymentSettings',()=>({paymentSettingsApi:{get:vi.fn(),save:vi.fn(),admin:vi.fn(),review:vi.fn()}}));
+const settings={seller_id:'2',upi_id:'fixture@upi',account_holder_name:'Test seller',accept_cod:true,accept_upi:true,verification_status:'PENDING',updated_at:'2026-11-25T00:00:00Z',revision:1,review_reason:null,upi_enabled:false,upi_unavailable_reason:'Refund policy approval is pending.'};
+afterEach(()=>vi.clearAllMocks());
+it('saves seller-owned details without a verification claim and keeps UPI unavailable',async()=>{
+  vi.mocked(paymentSettingsApi.get).mockResolvedValue(settings);
+  vi.mocked(paymentSettingsApi.save).mockResolvedValue(settings);
+  render(<MemoryRouter><SellerPaymentSettingsPage/></MemoryRouter>);
+  await screen.findByDisplayValue('fixture@upi');
+  expect(screen.getByText('Refund policy approval is pending.')).toBeInTheDocument();
+  expect(screen.queryByRole('img',{name:/QR/})).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Account holder name'),{target:{value:'Changed holder'}});
+  fireEvent.click(screen.getByRole('button',{name:'Save payment settings'}));
+  await waitFor(()=>expect(paymentSettingsApi.save).toHaveBeenCalledWith({upi_id:'fixture@upi',account_holder_name:'Changed holder',accept_cod:true,accept_upi:true}));
+  expect(paymentSettingsApi.save).not.toHaveBeenCalledWith(expect.objectContaining({verification_status:'APPROVED'}));
+});
+it('requires an admin reason and submits the exact reviewed revision timestamp',async()=>{
+  vi.mocked(paymentSettingsApi.admin).mockResolvedValue({items:[settings]});
+  vi.mocked(paymentSettingsApi.review).mockResolvedValue({...settings,verification_status:'APPROVED'});
+  render(<MemoryRouter><AdminPaymentSettingsPage/></MemoryRouter>);
+  await screen.findByText('fixture@upi');
+  expect(screen.getByRole('button',{name:'Approve destination'})).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Review reason'),{target:{value:'Reviewed submitted seller ownership evidence.'}});
+  fireEvent.click(screen.getByRole('button',{name:'Approve destination'}));
+  await waitFor(()=>expect(paymentSettingsApi.review).toHaveBeenCalledWith('2',{status:'APPROVED',expected_updated_at:settings.updated_at,reason:'Reviewed submitted seller ownership evidence.'}));
+  expect(screen.getByText(/not bank verification/)).toBeInTheDocument();
+});

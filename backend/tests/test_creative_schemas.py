@@ -6,6 +6,21 @@ def test_creative_contract_exists():
     import importlib.util
     assert importlib.util.find_spec('app.schemas.creative'), 'Creative contracts must exist'
 
+def test_professional_category_requires_explicit_matching_domain():
+    from app.schemas.creative import ListingInput
+    values = dict(title='Website', description='Build', category='Website Development', pricing='QUOTATION', remote=True)
+    with pytest.raises(ValidationError): ListingInput(**values)
+    assert ListingInput(**values, domain='PROFESSIONAL').domain == 'PROFESSIONAL'
+    with pytest.raises(ValidationError): ListingInput(**(values | {'category':'Photography'}), domain='PROFESSIONAL')
+
+def test_professional_notification_uses_professional_destination(monkeypatch):
+    from app.services.creative import CreativeService
+    emitted = []
+    monkeypatch.setattr('app.services.notifications.publish_event', lambda *args: emitted.append(args))
+    CreativeService(None)._event(1, 'key', 'CREATIVE_RFQ', 2, 'Enquiry', 'PROFESSIONAL')
+    assert emitted[0][4] == 'professional'
+    assert 'Professional Services' in emitted[0][7]
+
 
 @pytest.mark.parametrize('category',['Video Editing','Travel Video Editing','Influencer Reel Editing','VFX'])
 def test_approved_beta_creative_categories(category):

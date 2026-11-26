@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { House, LayoutDashboard, MoreHorizontal, Package, Palette, Images, MessageSquare, Search, ShoppingCart, ShoppingBag, Wallet, X } from 'lucide-react';
+import { House, Plus, Package, Palette, Search, ShoppingBag, UserRound, Code2, HousePlus, X } from 'lucide-react';
 import type { NavigationItem } from './Shared';
+import '../styles/mobile-navigation-polish.css';
+
+const MENU_EVENT='whatnot:open-mobile-menu';
+export function openMobileMenu(){window.dispatchEvent(new Event(MENU_EVENT));}
 
 export function useMobileNavigation(){
   const [mobile,setMobile]=useState(()=>typeof matchMedia==='function'&&matchMedia('(max-width: 760px)').matches);
@@ -15,55 +19,51 @@ export function useMobileNavigation(){
 }
 
 type Role='buyer'|'seller'|'admin';
-function primaryItems(role:Role|undefined,creative:boolean):NavigationItem[]{
-  if(role==='buyer')return [
-    {href:'/',label:'Home',icon:House},{href:'/buyer',label:'Explore',icon:Search},
-    {href:'/buyer/cart',label:'Cart',icon:ShoppingCart},{href:'/buyer/orders',label:'Orders',icon:ShoppingBag},
-  ];
-  if(role==='seller'&&creative)return [
-    {href:'/seller/creative',label:'Overview',icon:LayoutDashboard},
-    {href:'/seller/creative#services',label:'Services',icon:Palette},
-    {href:'/seller/creative#enquiries',label:'Enquiries',icon:MessageSquare},
-    {href:'/seller/creative#portfolio',label:'Portfolio',icon:Images},
-  ];
-  if(role==='seller')return [
-    {href:'/seller',label:'Overview',icon:LayoutDashboard},{href:'/seller#products',label:'Products',icon:Package,matchPrefix:'/seller/products/'},
-    {href:'/seller/orders',label:'Orders',icon:ShoppingBag},{href:'/seller/payments',label:'Payments',icon:Wallet},
-  ];
-  if(role==='admin')return [
-    {href:'/admin',label:'Review',icon:LayoutDashboard},{href:'/admin/operations',label:'Operations',icon:ShoppingBag},
-    {href:'/admin/payments',label:'Payments',icon:Wallet},
-  ];
-  return [{href:'/',label:'Home',icon:House},{href:'/#explore',label:'Explore',icon:Search}];
-}
-
-export function MobileNavigation({items,role,creative=false,accountControls}:{items:NavigationItem[];role?:Role;creative?:boolean;accountControls?:ReactNode}){
-  const location=useLocation(),[open,setOpen]=useState(false);
-  const trigger=useRef<HTMLButtonElement>(null),dialog=useRef<HTMLDialogElement>(null),restore=useRef(false);
-  const primary=primaryItems(role,creative).filter(item=>!creative||items.some(existing=>existing.href===item.href));
-  const all=[...items,...primary];
+type Panel='more'|'create'|null;
+export function MobileNavigation({items,role,creative=false,professional=false,accountControls}:{items:NavigationItem[];role?:Role;creative?:boolean;professional?:boolean;accountControls?:ReactNode}){
+  const location=useLocation(),[panel,setPanel]=useState<Panel>(null);
+  const dialog=useRef<HTMLDialogElement>(null),returnFocus=useRef<HTMLElement|null>(null),restore=useRef(false);
+  const exploreHref=role==='buyer'?'/buyer':'/#explore';
+  const ordersHref=role==='admin'?'/admin/operations':role?`/${role}/orders`:'/login/buyer';
+  const all=[...items,{href:'/',label:'Home',icon:House}];
   const exact=all.find(item=>item.href===location.pathname+location.hash);
   const active=exact??all.filter(item=>item.matchPrefix?location.pathname.startsWith(item.matchPrefix):!item.href.includes('#')&&item.href!=='/'&&(location.pathname===item.href||location.pathname.startsWith(item.href+'/'))).sort((a,b)=>(b.matchPrefix??b.href).length-(a.matchPrefix??a.href).length)[0];
-  const secondary=items.filter(item=>!primary.some(first=>first.href===item.href));
-  if(role&&!all.some(item=>item.href==='/'))secondary.push({href:'/',label:'Marketplace home',icon:House});
-  const primaryActive=primary.find(item=>item.href===active?.href)??primary.find(item=>item.matchPrefix&&location.pathname.startsWith(item.matchPrefix));
-  const secondaryActive=Boolean(active&&!primaryActive);
-  const close=()=>{restore.current=true;setOpen(false);};
+  const homeActive=location.pathname==='/'&&!location.hash;
+  const exploreActive=location.pathname+location.hash===exploreHref||location.pathname==='/creative-services'||location.pathname==='/professional-services';
+  const ordersActive=Boolean(role&&(location.pathname===ordersHref||location.pathname.startsWith(ordersHref+'/')));
+  const createActive=role==='seller'&&location.pathname==='/seller/products/new';
+  const profileActive=Boolean(active&&!homeActive&&!exploreActive&&!ordersActive&&!createActive);
+  const destinations=items.filter((item,index)=>items.findIndex(other=>other.href===item.href&&other.label===item.label)===index);
+  if(!destinations.some(item=>item.href==='/'))destinations.push({href:'/',label:'Marketplace home',icon:House});
+  const show=(next:Exclude<Panel,null>,source?:HTMLElement)=>{
+    returnFocus.current=source??(document.activeElement instanceof HTMLElement?document.activeElement:null);
+    restore.current=true;setPanel(next);
+  };
+  const close=()=>setPanel(null);
+  const navigate=()=>{restore.current=false;setPanel(null);};
   useEffect(()=>{
-    if(!open)return;
+    const open=()=>show('more');window.addEventListener(MENU_EVENT,open);
+    return()=>window.removeEventListener(MENU_EVENT,open);
+  },[]);
+  useEffect(()=>{
+    if(!panel)return;
     const element=dialog.current!;
     const previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
     if(typeof element.showModal==='function')element.showModal();else element.setAttribute('open','');
     element.querySelector<HTMLButtonElement>('button')?.focus();
-    return()=>{if(typeof element.close==='function')element.close();document.body.style.overflow=previousOverflow;if(restore.current)trigger.current?.focus();restore.current=false;};
-  },[open]);
-  useEffect(()=>{setOpen(false);},[location.key]);
+    return()=>{if(typeof element.close==='function')element.close();document.body.style.overflow=previousOverflow;if(restore.current&&returnFocus.current?.isConnected)returnFocus.current.focus();restore.current=false;};
+  },[panel]);
+  useEffect(()=>{restore.current=false;setPanel(null);},[location.key,role]);
+  const current=(selected:boolean)=>selected?(location.hash?'location' as const:'page' as const):undefined;
   return <>
-    <nav className="mobile-bottom-nav" aria-label="Primary navigation" data-items={primary.length+1}>
-      {primary.map(({href,label,icon:Icon})=><Link key={href} to={href} aria-current={primaryActive?.href===href?(location.hash&&href===location.pathname+location.hash?'location':'page'):undefined}><Icon size={21} aria-hidden="true"/><span>{label}</span></Link>)}
-      <button ref={trigger} type="button" aria-label={role==='buyer'?'Account and more navigation':'More navigation'} aria-expanded={open} aria-controls="mobile-more-dialog" aria-haspopup="dialog" aria-current={secondaryActive?(location.hash?'location':'page'):undefined} onClick={()=>setOpen(true)}><MoreHorizontal size={21} aria-hidden="true"/><span>{role==='buyer'?'Account':'More'}</span></button>
+    <nav className="mobile-bottom-nav polished-mobile-navigation" aria-label="Primary navigation" data-items="5">
+      <Link to="/" aria-current={current(homeActive)}><House size={21} aria-hidden="true"/><span>Home</span></Link>
+      <Link to={exploreHref} aria-current={current(exploreActive)}><Search size={21} aria-hidden="true"/><span>Explore</span></Link>
+      <button className="mobile-create-action" type="button" aria-label="Create" aria-expanded={panel==='create'} aria-controls="mobile-create-dialog" aria-haspopup="dialog" aria-current={current(createActive)} onClick={event=>show('create',event.currentTarget)}><span className="mobile-create-icon"><Plus size={25} aria-hidden="true"/></span><span>Create</span></button>
+      <Link to={ordersHref} aria-current={current(ordersActive)}><ShoppingBag size={21} aria-hidden="true"/><span>Orders</span></Link>
+      <button type="button" aria-label="Profile" aria-expanded={panel==='more'} aria-controls="mobile-more-dialog" aria-haspopup="dialog" aria-current={current(profileActive)} onClick={event=>show('more',event.currentTarget)}><UserRound size={21} aria-hidden="true"/><span>Profile</span></button>
     </nav>
-    {open&&<dialog ref={dialog} id="mobile-more-dialog" className="mobile-more-dialog" aria-modal="true" aria-labelledby="mobile-more-title" onCancel={event=>{event.preventDefault();close();}} onKeyDown={event=>{
+    {panel&&<dialog ref={dialog} id={panel==='more'?'mobile-more-dialog':'mobile-create-dialog'} className="mobile-more-dialog polished-mobile-dialog" aria-modal="true" aria-labelledby="mobile-panel-title" onCancel={event=>{event.preventDefault();close();}} onKeyDown={event=>{
       if(event.key==='Escape'){event.preventDefault();close();return;}
       if(event.key!=='Tab')return;
       const controls=[...event.currentTarget.querySelectorAll<HTMLElement>('a[href],button:not([disabled])')];
@@ -71,9 +71,13 @@ export function MobileNavigation({items,role,creative=false,accountControls}:{it
       if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
       else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
     }}>
-      <div className="more-heading"><div><p className="eyebrow">{creative?'Creative Studio':role?`${role} workspace`:'Marketplace'}</p><h2 id="mobile-more-title">More destinations</h2></div><button type="button" className="icon-button" aria-label="Close navigation" onClick={close}><X size={22} aria-hidden="true"/></button></div>
-      <nav aria-label="More destinations">{secondary.map(({href,label,icon:Icon})=><Link key={`${href}:${label}`} to={href} aria-current={active?.href===href?(href.includes('#')?'location':'page'):undefined} onClick={()=>{restore.current=false;setOpen(false);}}><Icon size={20} aria-hidden="true"/><span>{label}</span></Link>)}</nav>
-      {accountControls&&<div className="more-account">{accountControls}</div>}
+      <div className="more-heading"><div><p className="eyebrow">{professional?'Professional Dashboard':creative?'Creative Studio':role?`${role} workspace`:'Marketplace'}</p><h2 id="mobile-panel-title">{panel==='more'?'More destinations':'Create something local'}</h2></div><button type="button" className="icon-button" aria-label={panel==='more'?'Close navigation':'Close create'} onClick={close}><X size={22} aria-hidden="true"/></button></div>
+      {panel==='more'?<><nav aria-label="More destinations">{destinations.map(({href,label,icon:Icon})=><Link key={`${href}:${label}`} to={href} aria-current={active?.href===href?(href.includes('#')?'location':'page'):undefined} onClick={navigate}><Icon size={20} aria-hidden="true"/><span>{label}</span></Link>)}</nav>{accountControls&&<div className="more-account">{accountControls}</div>}</>:role==='seller'?<><p className="mobile-create-guidance">Choose what you want to offer. Your existing profile and approval requirements still apply.</p><nav aria-label="Creation workflows">{[
+        {href:'/seller/products/new',label:'Add product',icon:Package},
+        {href:'/seller/creative#services',label:'Creative service',icon:Palette},
+        {href:'/seller/professional#services',label:'Professional service',icon:Code2},
+        {href:'/seller/properties',label:'Property listing',icon:HousePlus},
+      ].map(({href,label,icon:Icon})=><Link key={href} to={href} onClick={navigate}><Icon size={20} aria-hidden="true"/><span>{label}</span></Link>)}</nav></>:role==='admin'?<><p className="mobile-create-guidance">Review listings and manage marketplace operations in your administrator workspace.</p><nav aria-label="Administrator workspace"><Link to="/admin" onClick={navigate}>Open moderation workspace</Link></nav></>:<><p className="mobile-create-guidance">Listings are created through a seller account. Register as a seller or sign in with your seller account to get started.</p><nav aria-label="Seller account options"><Link to="/register?role=seller" onClick={navigate}>Register as a seller</Link><Link to="/login/seller" onClick={navigate}>Sign in as a seller</Link></nav></>}
     </dialog>}
   </>;
 }

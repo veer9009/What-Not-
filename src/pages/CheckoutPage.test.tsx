@@ -1,0 +1,22 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { CheckoutPage } from './CheckoutPage';
+import { CartPage } from './CartPage';
+const mocks=vi.hoisted(()=>({preview:vi.fn(),place:vi.fn(),dispatch:vi.fn()}));
+vi.mock('../state/AuthContext',()=>({useAuth:()=>({user:{id:'1'},sessionKey:1})}));
+vi.mock('../state/DemoContext',()=>({useDemo:()=>({state:{placements:[],products:[{id:'backend:3',name:'Vase',seller:'Maker',price:12,stock:5,distance:0,radius:2,status:'APPROVED',isActive:true,backend:{productId:'3',sellerId:'2',unitPrice:'12.00'}}],cart:[{productId:'backend:3',quantity:1}]},dispatch:mocks.dispatch})}));
+vi.mock('../components/Shared',()=>({DashboardShell:({children}:{children:React.ReactNode})=><main>{children}</main>,PageTop:({title}:{title:string})=><h1>{title}</h1>,EmptyState:()=>null}));
+vi.mock('../api/addresses',()=>({addressesApi:{list:async()=>[{id:'4',label:'Home',address_line1:'Lane',city:'Mumbai',state:'MH',pincode:'400001'}]}}));
+vi.mock('../api/checkout',async importOriginal=>({...await importOriginal<typeof import('../api/checkout')>(),checkoutApi:{preview:mocks.preview,place:mocks.place}}));
+beforeEach(()=>{sessionStorage.clear();vi.clearAllMocks();mocks.preview.mockResolvedValue({groups:[{seller_id:'2',seller_name:'Maker',items:[{product_id:'3',name:'Vase',quantity:1,unit_price:'12.00'}],subtotal:'12.00',delivery_fee:'0.00',total:'12.00',available_payment_methods:['COD'],upi_unavailable_reason:'UPI is disabled pending approval.'}],total:'12.00',currency:'INR'});mocks.place.mockResolvedValue({orders:[{id:'9',total:'12.00'}]});});
+afterEach(cleanup);
+it('opens checkout from cart without placing any order',()=>{render(<MemoryRouter><CartPage/></MemoryRouter>);expect(screen.getByRole('link',{name:'Checkout'})).toHaveAttribute('href','/buyer/checkout');expect(mocks.place).not.toHaveBeenCalled();});
+it('requires an explicit address, method and final confirmation, storing the original batch before sending',async()=>{
+ render(<MemoryRouter><CheckoutPage/></MemoryRouter>);await screen.findByRole('option',{name:/Home/});
+ expect(screen.getByRole('button',{name:'Review final order'})).toBeDisabled();fireEvent.change(screen.getByLabelText('Delivery address'),{target:{value:'4'}});
+ await screen.findByLabelText('Cash on delivery — Maker');expect(screen.getByRole('button',{name:'Review final order'})).toBeDisabled();expect(screen.getByLabelText('UPI — Maker')).toBeDisabled();
+ fireEvent.click(screen.getByLabelText('Cash on delivery — Maker'));fireEvent.click(screen.getByRole('button',{name:'Review final order'}));await screen.findByRole('button',{name:'Confirm and place orders'});expect(mocks.place).not.toHaveBeenCalled();
+ mocks.place.mockImplementation(async()=>{expect(sessionStorage.getItem('whatnot:checkout-batch:1')).toContain('"payment_method":"COD"');return {orders:[{id:'9',total:'12.00'}]};});
+ fireEvent.click(screen.getByRole('button',{name:'Confirm and place orders'}));await screen.findByText('Orders placed');expect(mocks.place).toHaveBeenCalledTimes(1);await waitFor(()=>expect(sessionStorage.getItem('whatnot:checkout-batch:1')).toBeNull());
+});

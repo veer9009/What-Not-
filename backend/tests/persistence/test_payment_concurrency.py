@@ -5,6 +5,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from app.models import User, SellerProfile, Address, Order
 from app.models.payment import OrderPayment
+from app.models.shopping import SellerPaymentSettings
+from app.core.config import Settings
 from app.models.events import AuditEvent
 from app.schemas.payment import ConfirmationInput, ReportInput, MethodInput
 from app.services.payments import PaymentService
@@ -22,6 +24,7 @@ def seed(engine,with_payment=True):
         order=Order(buyer=buyer,seller=shop,address=address,status='ACCEPTED',subtotal=Decimal('0.30'),delivery_fee=Decimal('0.00'),total_amount=Decimal('0.30'))
         session.add(order);session.flush()
         if with_payment:session.add(OrderPayment(order_id=order.id,method='UPI',status='PENDING'))
+        else:session.add(SellerPaymentSettings(seller_id=shop.id,upi_id='synthetic@example',account_holder_name='Synthetic seller',accept_cod=True,accept_upi=True,verification_status='APPROVED'))
         return buyer.id,owner.id,order.id
 
 
@@ -61,7 +64,7 @@ def test_conflicting_first_methods_create_one_record_and_audit(concurrency_engin
     def choose(method):
         with Session(concurrency_engine) as session,session.begin():
             barrier.wait(timeout=10)
-            try:return PaymentService(session).record_method(buyer,order,MethodInput(method=method))['method']
+            try:return PaymentService(session,Settings(_env_file=None,environment='test',prepaid_upi_enabled=True,approved_refund_policy_reference='SIMULATED-TEST-POLICY-ONLY')).record_method(buyer,order,MethodInput(method=method))['method']
             except PersistenceConflict:return 'CONFLICT'
     with ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(choose,['COD','UPI']))
     assert results.count('CONFLICT')==1

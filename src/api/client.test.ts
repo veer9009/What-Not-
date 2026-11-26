@@ -4,6 +4,10 @@ import { ApiError, api, setAccessToken, getAccessToken, onUnauthorized } from '.
 afterEach(() => { setAccessToken(null); vi.unstubAllGlobals(); });
 function response(body: string, status = 200) { return new Response(body, { status, headers: { 'Content-Type': 'application/json' } }); }
 describe('HTTP client', () => {
+  it('preserves a text UPI destination while normalizing the seller identity',async()=>{
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(response('{"seller_id":9007199254740993,"upi_id":"synthetic-seller@invalid"}')));
+    expect(await api('/payments/settings')).toEqual({seller_id:'9007199254740993',upi_id:'synthetic-seller@invalid'});
+  });
   it.each(['/auth/register', '/auth/login', '/auth/refresh', '/auth/me'])('explains controlled beta admission denial for %s', async path => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response('{"detail":"This account is not admitted to the controlled beta"}', 403)));
     await expect(api(path, { auth: false })).rejects.toThrow(/approved beta email.*contact.*beta organizer/i);

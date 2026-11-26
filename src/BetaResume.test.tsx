@@ -21,10 +21,10 @@ it('submits the exact product revision reviewed by the administrator',async()=>{
   await waitFor(()=>expect(writes).toEqual([{expected_updated_at:updated_at}]));
 });
 
-it('public copy advertises sale-only beta workflows without claiming legal proof verification',()=>{
+it('public copy advertises sale-only beta workflows without claiming legal proof verification',async()=>{
   render(<MemoryRouter><App/></MemoryRouter>);
   expect(screen.queryByText(/rent or sale/i)).not.toBeInTheDocument();
-  expect(screen.getByRole('link',{name:'Explore sale properties'})).toHaveAttribute('href','/buyer/properties');
-  expect(screen.getByRole('link',{name:'Explore Creative Services'})).toHaveAttribute('href','/buyer/creative');
+  expect(await screen.findByRole('link',{name:'Explore sale properties'})).toHaveAttribute('href','/buyer/properties');
+  expect(screen.getByRole('link',{name:'Explore Creative Services'})).toHaveAttribute('href','/creative-services');
   expect(screen.queryByText(/Checkout is unavailable/i)).not.toBeInTheDocument();
 });

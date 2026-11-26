@@ -46,7 +46,8 @@ class DeliveryFeePolicy:
 
 class OrderService:
     def __init__(self, session: Session, fee_policy: DeliveryFeePolicy | None = None, settings=None,
-                 require_price_confirmation=False):
+                 require_price_confirmation=False, require_payment_method=False):
+        self.require_payment_method = require_payment_method
         self.require_price_confirmation = require_price_confirmation
         self._settings_provided = settings is not None
         self.settings = settings or Settings(_env_file=None)
@@ -56,14 +57,15 @@ class OrderService:
         self.fee_policy = fee_policy or DeliveryFeePolicy()
 
     @write_operation
-    def create(self, data: OrderPlacement):
+    def create(self, data: OrderPlacement, *, validate_only=False):
         """Atomic placement with locked inventory and authoritative delivery eligibility."""
         data = OrderPlacement.model_validate(data)
-        require_user(self.session, data.buyer_id, role='BUYER', lock='shared')
+        require_user(self.session, data.buyer_id, role='BUYER', lock=True if data.payment_method is not None or self.require_payment_method else 'shared')
         fingerprint = None
         if data.idempotency_key is not None:
             logical_request = dict(address_id=data.address_id, seller_id=data.seller_id,
                 items=[item.model_dump(mode='json', exclude_none=True) for item in sorted(data.items, key=lambda item: item.product_id)])
+            if data.payment_method is not None:logical_request['payment_method']=data.payment_method
             fingerprint = sha256(json.dumps(logical_request, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
             self.repository.lock_idempotency(data.buyer_id, data.idempotency_key)
             existing = self.repository.for_idempotency(data.buyer_id, data.idempotency_key)
@@ -72,9 +74,11 @@ class OrderService:
                     raise IdempotencyConflict('This idempotency key was already used for a different order request')
                 # A replay returns the purchase snapshot, even if stock/location has changed.
                 return existing
+        if self.require_payment_method and data.payment_method is None:
+            raise ProductUnavailable('Select a payment method before ordering')
         if self.require_price_confirmation and any(item.expected_unit_price is None for item in data.items):
             raise ProductUnavailable('Review and confirm the current price for every item before ordering')
-        if self._settings_provided and self.settings.environment != 'test':
+        if not validate_only and self._settings_provided and self.settings.environment != 'test':
             from app.services.abuse import check_action_limit
             check_action_limit(self.session, self.settings, 'checkout', data.buyer_id)
         address = owned_address(self.session, data.buyer_id, data.address_id, lock=True)
@@ -113,11 +117,15 @@ class OrderService:
         order = Order(buyer_id=data.buyer_id, seller_id=data.seller_id, address_id=data.address_id,
             idempotency_key=data.idempotency_key, request_fingerprint=fingerprint,
             status='PLACED', subtotal=subtotal, delivery_fee=delivery_fee, total_amount=total, items=items)
+        if validate_only:return order
         self.repository.add(order)
         for requested in data.items:
             by_id[requested.product_id].stock_quantity -= requested.quantity
         self.session.flush()
         self._record(order, None, 'PLACED', data.buyer_id, 'PLACED')
+        if data.payment_method is not None:
+            from app.services.payments import PaymentService
+            PaymentService(self.session,self.settings).record_method(data.buyer_id,order.id,dict(method=data.payment_method))
         return order
 
     def _owned(self, actor, order):

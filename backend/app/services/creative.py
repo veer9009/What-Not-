@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
-from sqlalchemy import select
+from sqlalchemy import select, func, or_
 from app.models.user import User
 from app.models.creative import CreativeProvider, CreativeListing, CreativeRFQ, CreativeResponse, CreativeEngagement, CreativeReview
 from app.schemas.creative import ProviderInput, ListingInput, RFQInput, ResponseInput, ReviewInput, ModerationInput
@@ -40,9 +40,10 @@ class CreativeService:
                 raise PersistenceConflict('Service is unavailable')
         return listing, provider
 
-    def _event(self, recipient, key, kind, id, title):
+    def _event(self, recipient, key, kind, id, title, domain='CREATIVE'):
         from app.services.notifications import publish_event
-        publish_event(self.session, recipient, key, kind, 'creative', id, title, 'Open Creative Services to view this update.')
+        entity = 'professional' if domain == 'PROFESSIONAL' else 'creative'
+        publish_event(self.session, recipient, key, kind, entity, id, title, f'Open {entity.title()} Services to view this update.')
 
     def _audit(self, actor, engagement, previous):
         from app.models.events import AuditEvent
@@ -80,6 +81,7 @@ class CreativeService:
         provider = self._provider(actor, True)
         listing, _ = self._listing(id, True)
         if listing.provider_id != provider.id: raise OwnershipError('Not your listing')
+        if listing.domain != data.domain: raise PersistenceConflict('Listing domain cannot be changed')
         if listing.status == 'TAKEN_DOWN': raise PersistenceConflict('Admin takedown requires admin review')
         for key, value in data.model_dump(mode='json').items(): setattr(listing, key, value)
         listing.status, listing.rejection_reason = 'PENDING', None
@@ -106,22 +108,58 @@ class CreativeService:
         listing.status, listing.rejection_reason = data.status, data.reason
         from app.models.events import AuditEvent
         self.session.add(AuditEvent(actor_id=actor, action='CREATIVE_MODERATION', entity_type='creative_listing', entity_id=id, previous_status=previous, next_status=data.status, reason=data.reason or 'Approved'))
-        self._event(provider.user_id, f'creative:listing:{id}:{data.status}:{listing.updated_at}', 'CREATIVE_MODERATION', id, 'Service listing reviewed')
+        self._event(provider.user_id, f'creative:listing:{id}:{data.status}:{listing.updated_at}', 'CREATIVE_MODERATION', id, 'Service listing reviewed', listing.domain)
         return listing
 
-    def public_listings(self, *, offset=0, limit=50):
-        offset, limit = pagination(offset, limit)
-        return list(self.session.scalars(select(CreativeListing).join(CreativeProvider, CreativeProvider.id == CreativeListing.provider_id).join(User, User.id == CreativeProvider.user_id).where(CreativeListing.status == 'APPROVED', CreativeListing.is_active.is_(True), User.is_active.is_(True)).order_by(CreativeListing.id.desc()).offset(offset).limit(limit)))
+    def _listing_filters(self, query, domain, q=None, category=None, remote=None):
+        query = query.where(CreativeListing.domain == domain)
+        if q: query = query.where(or_(CreativeListing.title.ilike('%' + q + '%'), CreativeListing.description.ilike('%' + q + '%')))
+        if category: query = query.where(CreativeListing.category == category)
+        if remote is not None: query = query.where(CreativeListing.remote == remote)
+        return query
 
-    def own_listings(self, actor, *, offset=0, limit=50):
+    def public_listings(self, *, domain='CREATIVE', q=None, category=None, remote=None, offset=0, limit=50):
+        offset, limit = pagination(offset, limit)
+        query = select(CreativeListing).join(CreativeProvider, CreativeProvider.id == CreativeListing.provider_id).join(User, User.id == CreativeProvider.user_id).where(CreativeListing.status == 'APPROVED', CreativeListing.is_active.is_(True), User.is_active.is_(True))
+        return list(self.session.scalars(self._listing_filters(query, domain, q, category, remote).order_by(CreativeListing.id.desc()).offset(offset).limit(limit)))
+
+    def own_listings(self, actor, *, domain='CREATIVE', q=None, category=None, remote=None, offset=0, limit=50):
         offset, limit = pagination(offset, limit)
         provider = self.provider(actor)
-        return [] if provider is None else list(self.session.scalars(select(CreativeListing).where(CreativeListing.provider_id == provider.id).order_by(CreativeListing.id.desc()).offset(offset).limit(limit)))
+        query = select(CreativeListing).where(CreativeListing.provider_id == provider.id) if provider else None
+        return [] if query is None else list(self.session.scalars(self._listing_filters(query, domain, q, category, remote).order_by(CreativeListing.id.desc()).offset(offset).limit(limit)))
 
-    def admin_listings(self, actor, *, offset=0, limit=50):
+    def admin_listings(self, actor, *, domain='CREATIVE', q=None, category=None, remote=None, offset=0, limit=50):
         require_user(self.session, actor, role='ADMIN')
         offset, limit = pagination(offset, limit)
-        return list(self.session.scalars(select(CreativeListing).order_by(CreativeListing.id.desc()).offset(offset).limit(limit)))
+        return list(self.session.scalars(self._listing_filters(select(CreativeListing), domain, q, category, remote).order_by(CreativeListing.id.desc()).offset(offset).limit(limit)))
+
+    def listing_view(self, listing):
+        from app.api.routes.creative import view
+        provider = self._get(CreativeProvider, listing.provider_id)
+        count, average = self.session.execute(select(func.count(CreativeReview.id), func.avg(CreativeReview.rating)).select_from(CreativeReview).join(CreativeEngagement, CreativeEngagement.id == CreativeReview.engagement_id).join(CreativeRFQ, CreativeRFQ.id == CreativeEngagement.rfq_id).where(CreativeRFQ.listing_id == listing.id, CreativeEngagement.status == 'COMPLETED')).one()
+        return dict(view(listing), provider_name=provider.display_name, provider_verification='NOT_RECORDED', review_count=count, rating_average=str(average) if average is not None else None)
+
+    def dashboard(self, actor, domain):
+        provider = self.provider(actor)
+        keys = ('active_services', 'pending_approvals', 'new_enquiries', 'submitted_quotations', 'ongoing_projects', 'completed_projects')
+        if provider is None: return dict.fromkeys(keys, 0)
+        listings = select(CreativeListing.id).where(CreativeListing.provider_id == provider.id, CreativeListing.domain == domain)
+        rfqs = select(CreativeRFQ.id).where(CreativeRFQ.listing_id.in_(listings))
+        engagements = select(CreativeEngagement.id).where(CreativeEngagement.provider_id == provider.id, CreativeEngagement.rfq_id.in_(rfqs))
+        def count(query): return self.session.scalar(select(func.count()).select_from(query.subquery()))
+        return dict(active_services=count(select(CreativeListing.id).where(CreativeListing.id.in_(listings), CreativeListing.status == 'APPROVED', CreativeListing.is_active.is_(True))),
+                    pending_approvals=count(select(CreativeListing.id).where(CreativeListing.id.in_(listings), CreativeListing.status == 'PENDING')),
+                    new_enquiries=count(select(CreativeRFQ.id).where(CreativeRFQ.id.in_(rfqs), ~select(CreativeResponse.id).where(CreativeResponse.rfq_id == CreativeRFQ.id).exists())),
+                    submitted_quotations=count(select(CreativeResponse.id).where(CreativeResponse.rfq_id.in_(rfqs))),
+                    ongoing_projects=count(select(CreativeEngagement.id).where(CreativeEngagement.id.in_(engagements), CreativeEngagement.status.in_(('ACCEPTED', 'DELIVERED')))),
+                    completed_projects=count(select(CreativeEngagement.id).where(CreativeEngagement.id.in_(engagements), CreativeEngagement.status == 'COMPLETED')))
+
+    def reviews(self, actor, domain):
+        provider = self.provider(actor)
+        if provider is None: return []
+        rows = self.session.execute(select(CreativeReview, CreativeRFQ.listing_id).join(CreativeEngagement, CreativeEngagement.id == CreativeReview.engagement_id).join(CreativeRFQ, CreativeRFQ.id == CreativeEngagement.rfq_id).join(CreativeListing, CreativeListing.id == CreativeRFQ.listing_id).where(CreativeEngagement.provider_id == provider.id, CreativeEngagement.status == 'COMPLETED', CreativeListing.domain == domain).order_by(CreativeReview.id.desc())).all()
+        return [dict(id=r.id, engagement_id=r.engagement_id, listing_id=listing_id, rating=r.rating, comment=r.text, created_at=r.created_at) for r, listing_id in rows]
 
     @write_operation
     def create_rfq(self, actor, id, data):
@@ -139,7 +177,7 @@ class CreativeService:
         if provider.user_id == actor: raise OwnershipError('Cannot enquire on your own listing')
         rfq = CreativeRFQ(listing_id=id, buyer_id=actor, **values)
         self.session.add(rfq); self.session.flush()
-        self._event(provider.user_id, f'creative:rfq:{rfq.id}', 'CREATIVE_RFQ', rfq.id, 'New service enquiry')
+        self._event(provider.user_id, f'creative:rfq:{rfq.id}', 'CREATIVE_RFQ', rfq.id, 'New service enquiry', listing.domain)
         return rfq
 
     def _rfq_owner(self, actor, rfq, role):
@@ -165,7 +203,7 @@ class CreativeService:
             raise PersistenceConflict('Accepted terms cannot change')
         response = CreativeResponse(rfq_id=id, **values)
         self.session.add(response); self.session.flush()
-        self._event(rfq.buyer_id, f'creative:response:{response.id}', 'CREATIVE_RESPONSE', id, 'Service provider responded')
+        self._event(rfq.buyer_id, f'creative:response:{response.id}', 'CREATIVE_RESPONSE', id, 'Service provider responded', listing.domain)
         return response
 
     @write_operation
@@ -188,15 +226,15 @@ class CreativeService:
         engagement = CreativeEngagement(rfq_id=rfq.id, response_id=response.id, buyer_id=actor, provider_id=provider.id, title=listing.title, terms=response.terms, amount=response.amount, currency=response.currency)
         self.session.add(engagement); self.session.flush()
         self._audit(actor, engagement, None)
-        self._event(provider.user_id, f'creative:accepted:{engagement.id}', 'CREATIVE_ACCEPTED', engagement.id, 'Service quote accepted')
+        self._event(provider.user_id, f'creative:accepted:{engagement.id}', 'CREATIVE_ACCEPTED', engagement.id, 'Service quote accepted', listing.domain)
         return engagement
 
-    def list_rfqs(self, actor, *, offset=0, limit=50):
+    def list_rfqs(self, actor, *, domain='CREATIVE', offset=0, limit=50):
         user = require_user(self.session, actor)
         offset, limit = pagination(offset, limit)
-        query = select(CreativeRFQ)
+        query = select(CreativeRFQ).join(CreativeListing, CreativeListing.id == CreativeRFQ.listing_id).where(CreativeListing.domain == domain)
         if user.role == 'BUYER': query = query.where(CreativeRFQ.buyer_id == actor)
-        elif user.role == 'SELLER': query = query.join(CreativeListing, CreativeListing.id == CreativeRFQ.listing_id).join(CreativeProvider, CreativeProvider.id == CreativeListing.provider_id).where(CreativeProvider.user_id == actor)
+        elif user.role == 'SELLER': query = query.join(CreativeProvider, CreativeProvider.id == CreativeListing.provider_id).where(CreativeProvider.user_id == actor)
         elif user.role != 'ADMIN': raise OwnershipError('Not permitted')
         return list(self.session.scalars(query.order_by(CreativeRFQ.id.desc()).offset(offset).limit(limit)))
 
@@ -206,10 +244,10 @@ class CreativeService:
         if user.role != 'ADMIN': self._rfq_owner(actor, rfq, user.role)
         return list(self.session.scalars(select(CreativeResponse).where(CreativeResponse.rfq_id == id).order_by(CreativeResponse.id.desc()).limit(100)))
 
-    def engagements(self, actor, *, offset=0, limit=50):
+    def engagements(self, actor, *, domain='CREATIVE', offset=0, limit=50):
         user = require_user(self.session, actor)
         offset, limit = pagination(offset, limit)
-        query = select(CreativeEngagement)
+        query = select(CreativeEngagement).join(CreativeRFQ, CreativeRFQ.id == CreativeEngagement.rfq_id).join(CreativeListing, CreativeListing.id == CreativeRFQ.listing_id).where(CreativeListing.domain == domain)
         if user.role == 'BUYER': query = query.where(CreativeEngagement.buyer_id == actor)
         elif user.role == 'SELLER': query = query.join(CreativeProvider, CreativeProvider.id == CreativeEngagement.provider_id).where(CreativeProvider.user_id == actor)
         elif user.role != 'ADMIN': raise OwnershipError('Not permitted')
@@ -223,7 +261,8 @@ class CreativeService:
         if engagement.status in ('DELIVERED', 'COMPLETED'): return engagement
         engagement.status, engagement.delivered_at = 'DELIVERED', datetime.now(timezone.utc)
         self._audit(actor, engagement, 'ACCEPTED')
-        self._event(engagement.buyer_id, f'creative:delivered:{id}', 'CREATIVE_DELIVERED', id, 'Confirm service delivery')
+        listing = self._get(CreativeListing, self._get(CreativeRFQ, engagement.rfq_id).listing_id)
+        self._event(engagement.buyer_id, f'creative:delivered:{id}', 'CREATIVE_DELIVERED', id, 'Confirm service delivery', listing.domain)
         return engagement
 
     @write_operation
@@ -236,7 +275,8 @@ class CreativeService:
         engagement.status, engagement.completed_at = 'COMPLETED', datetime.now(timezone.utc)
         self._audit(actor, engagement, 'DELIVERED')
         provider = self._get(CreativeProvider, engagement.provider_id)
-        self._event(provider.user_id, f'creative:completed:{id}', 'CREATIVE_COMPLETED', id, 'Buyer confirmed completion')
+        listing = self._get(CreativeListing, self._get(CreativeRFQ, engagement.rfq_id).listing_id)
+        self._event(provider.user_id, f'creative:completed:{id}', 'CREATIVE_COMPLETED', id, 'Buyer confirmed completion', listing.domain)
         return engagement
 
     @write_operation

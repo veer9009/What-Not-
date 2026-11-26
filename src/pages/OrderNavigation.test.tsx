@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { OrderDetailsPage } from './OrderPages';
 import { ordersApi } from '../api/orders';
 import type { Fulfillment, Order } from '../api/types';
+vi.mock('../components/OrderPaymentPanel',()=>({OrderPaymentPanel:()=>null,OrderReceipt:()=>null}));
 
 const auth = vi.hoisted(()=>({role:'SELLER'}));
 vi.mock('../state/AuthContext',()=>({useAuth:()=>({user:{name:'Test',role:auth.role}})}));
@@ -72,7 +73,8 @@ it('requires buyer review and explicit confirmation of the order delivery point'
   open({...delivery,delivery_location:{latitude:'0',longitude:'0'},delivery_location_confirmed:false});
   expect(confirm).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByRole('button',{name:'Review delivery location'}));
-  await screen.findByText(/Latitude: 0, longitude: 0/);
+  await screen.findByText(/saved address has a delivery location available/i);
+  expect(screen.queryByText(/Latitude: 0, longitude: 0/)).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'Confirm delivery location for seller navigation'}));
   await waitFor(()=>expect(confirm).toHaveBeenCalledWith('9',{latitude:'0',longitude:'0'}));
   expect(await screen.findByText(/Delivery location confirmed for this order/)).toBeInTheDocument();

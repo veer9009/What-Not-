@@ -62,7 +62,8 @@
 }
 .neighborhood-home .neighborhood-categories .section-heading { margin-bottom: var(--space-6); }
 .neighborhood-home .neighborhood-categories h2 { font-size: clamp(1.5rem, 2.4vw, 2rem); margin: 0; }
-.neighborhood-home .neighborhood-category-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-6); }
+.neighborhood-home .neighborhood-category-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); }
+.professional-category .neighborhood-category-icon { color: #2463a2; background: #edf5ff; }
 .neighborhood-home .neighborhood-category {
   display: flex;
   flex-direction: column;

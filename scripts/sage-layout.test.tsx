@@ -8,6 +8,7 @@ import { LoginPage, RegisterPage } from '../src/pages/LoginPages';
 import { ProductForm, SellerProfilePage, SellerDashboard } from '../src/pages/SellerPages';
 import { AdminDashboard } from '../src/pages/AdminDashboard';
 import { DemoProvider } from '../src/state/DemoContext';
+import { DiscoveryProvider } from '../src/state/DiscoveryContext';
 import { DashboardShell } from '../src/components/Shared';
 import { ListingImage } from '../src/components/ListingImage';
 
@@ -20,7 +21,7 @@ const save = (name:string) => writeFileSync(`${folder}/${name}.html`,document.bo
 
 it('exports homepage, authentication, product form, and long listing details', () => {
   const cases = [
-    ['home', <DemoProvider><LandingPage/></DemoProvider>],
+    ['home', <DemoProvider><DiscoveryProvider><LandingPage/></DiscoveryProvider></DemoProvider>],
     ['login', <Routes><Route path="/login/:role" element={<LoginPage/>}/></Routes>], ['register', <RegisterPage/>],
     ['product-form', <DashboardShell role="seller"><ProductForm/></DashboardShell>],
     ['product-detail', <DashboardShell role="buyer"><div className="product-detail"><div className="detail-image"><ListingImage src={null} alt="Handcrafted vase"/></div><div className="detail-copy"><p className="eyebrow">Crafts · Nearby locality</p><h1>Handcrafted ceramic vase with a deliberately long descriptive product name</h1><p>Local artisan with a long shop name</p><strong className="detail-price">₹12,500</strong><p>A synthetic description for testing long content and image alignment.</p><div className="detail-actions"><button className="btn btn-primary">Add to Cart</button></div></div></div></DashboardShell>],

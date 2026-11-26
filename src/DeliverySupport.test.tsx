@@ -56,7 +56,7 @@ it('confirms receipt through the real API and reloads backend truth', async () =
   await userEvent.click(await screen.findByRole('button', { name: 'Yes, I received it' }));
   await screen.findByRole('status');
   expect(writes).toEqual([{ path: '/orders/9007199254740993/status', method: 'PATCH', body: { status: 'COMPLETED' } }]);
-  expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith(`/orders/${order.id}`))).toHaveLength(2);
+  expect(fetcher.mock.calls.filter(([url]) => new URL(String(url),location.origin).pathname===`/api/v1/orders/${order.id}`)).toHaveLength(2);
   expect(screen.queryByRole('button', { name: 'Yes, I received it' })).not.toBeInTheDocument();
 });
 it.each(['PLACED', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'COMPLETED', 'DELIVERY_DISPUTED'])('does not offer confirmation in %s', async status => {

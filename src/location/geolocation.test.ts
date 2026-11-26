@@ -6,7 +6,7 @@ afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 describe('explicit location acquisition', () => {
   it('returns six-place coordinates with a finite fresh-position timeout', async () => {
     const result = await acquireLocation({ getCurrentPosition(success, _error, options) {
-      expect(options?.timeout).toBe(10000);
+      expect(options?.timeout).toBe(20000);
       expect(options?.maximumAge).toBe(0);
       expect(options?.enableHighAccuracy).toBe(true);
       success({ coords: { latitude: 19.12345678, longitude: 72.12345678, accuracy: 24.5 } } as GeolocationPosition);

@@ -23,6 +23,7 @@ class DiscoverySource(ContractModel):
 class DiscoveryQuery(DiscoverySource):
     offset: Annotated[int, Field(strict=True, ge=0, le=2147483647)] = 0
     limit: Annotated[int, Field(strict=True, ge=1, le=100)] = 100
+    q: Annotated[str | None, Field(max_length=120)] = None
 
 
 class BuyerProduct(ProductCreate):

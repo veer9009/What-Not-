@@ -7,7 +7,7 @@ export interface Visit { id:string;property_id:string;scheduled_at:string;status
 export interface PropertyReport { id:string;property_id:string;reason:string;explanation:string;disposition:string }
 const path=(id:string)=>`/properties/${identifier(id)}`;
 export const propertiesApi={
-  list:(offset=0,locality='',category='')=>api<PropertyListing[]>(`/properties?offset=${offset}&limit=30&locality=${encodeURIComponent(locality)}&category=${encodeURIComponent(category)}`,{auth:false}),
+  list:(offset=0,locality='',category='',options?:{q?:string;limit?:number})=>api<PropertyListing[]>(`/properties?offset=${offset}&limit=${options?.limit??30}&locality=${encodeURIComponent(locality)}&category=${encodeURIComponent(category)}${options?.q?'&q='+encodeURIComponent(options.q):''}`,{auth:false}),
   detail:(id:string)=>api<PropertyListing>(path(id),{auth:false}),
   mine:(offset=0)=>api<PropertyListing[]>(`/properties/mine?offset=${offset}&limit=30`),
   saved:(offset=0)=>api<PropertyListing[]>(`/properties/saved?offset=${offset}&limit=30`),

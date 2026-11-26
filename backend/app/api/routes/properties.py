@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query, Request
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from app.api.dependencies import Buyer, Seller, Admin, CurrentUser, TransactionSession
 from app.api.contracts import IdentifierPath
 from app.models.property import PropertyListing, PropertyReport, SavedProperty
@@ -10,11 +10,15 @@ router=APIRouter(prefix='/properties',tags=['Properties'])
 def record(row): return {c.name:getattr(row,c.name) for c in row.__table__.columns} if row else None
 def service(session,request):return PropertyService(session,request.app.state.settings.property_reconfirmation_days)
 @router.get('')
-def browse(session:TransactionSession,offset:int=Query(0,ge=0),limit:int=Query(30,ge=1,le=100),category:str|None=None,locality:str|None=None):
-    q=select(PropertyListing).join(User,User.id==PropertyListing.creator_id).where(PropertyListing.status=='APPROVED',PropertyListing.expires_at>now(),User.is_active.is_(True))
-    if category:q=q.where(PropertyListing.category==category)
-    if locality:q=q.where(PropertyListing.locality.ilike('%'+locality[:120]+'%'))
-    return [PropertyService(session).public(p) for p in session.scalars(q.order_by(PropertyListing.id.desc()).offset(offset).limit(limit))]
+def browse(session:TransactionSession,offset:int=Query(0,ge=0),limit:int=Query(30,ge=1,le=100),category:str|None=None,locality:str|None=None,q:str|None=Query(None,max_length=120)):
+    query=select(PropertyListing).join(User,User.id==PropertyListing.creator_id).where(PropertyListing.status=='APPROVED',PropertyListing.expires_at>now(),User.is_active.is_(True))
+    if category:query=query.where(PropertyListing.category==category)
+    if locality:query=query.where(PropertyListing.locality.ilike('%'+locality[:120]+'%'))
+    if q and q.strip():
+        term=q.strip().replace('\\','\\\\').replace('%','\\%').replace('_','\\_')
+        pattern='%'+term+'%'
+        query=query.where(or_(PropertyListing.title.ilike(pattern,escape='\\'),PropertyListing.description.ilike(pattern,escape='\\'),PropertyListing.locality.ilike(pattern,escape='\\')))
+    return [PropertyService(session).public(p) for p in session.scalars(query.order_by(PropertyListing.id.desc()).offset(offset).limit(limit))]
 @router.get('/profile')
 def profile(user:Seller,session:TransactionSession):return record(PropertyService(session).profile(user))
 @router.post('/profile')

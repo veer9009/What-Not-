@@ -12,13 +12,14 @@ function setup(handler:(path:string,body:any)=>Reply|Promise<Reply>,path='/buyer
   setAccessToken('location-test');
   const fetcher=vi.fn(async(input:string,options:RequestInit)=>{
     const path=new URL(input, location.origin).pathname.replace('/api/v1','');
-    const [status,body]=path==='/auth/me'?[200,{id:1,name:'Ravi',email:'ravi@example.com',role:'BUYER'}]:await handler(path,options.body?JSON.parse(String(options.body)):undefined);
+    const [status,body]=path==='/auth/me'?[200,{id:1,name:'Ravi',email:'ravi@example.com',role:'BUYER'}]:path==='/wishlist'?[200,{items:[],count:0}]:path==='/notifications/unread-count'?[200,{count:0}]:await handler(path,options.body?JSON.parse(String(options.body)):undefined);
     return new Response(JSON.stringify(body),{status});
   });vi.stubGlobal('fetch',fetcher);
   render(<MemoryRouter initialEntries={[path]}><App/></MemoryRouter>);
   return fetcher;
 }
 afterEach(()=>{setAccessToken(null);vi.unstubAllGlobals();});
+it('refreshes supported, unsupported and supported GPS points without retaining stale cards',async()=>{let complete!:PositionCallback;const points:any[]=[];vi.stubGlobal('navigator',{geolocation:{getCurrentPosition:(cb:PositionCallback)=>{complete=cb;}}});setup((path,body)=>{if(path==='/addresses')return [200,[]];points.push(body);return [200,body.location.latitude===0?[product]:[]];});for(const latitude of [0,1,0]){await userEvent.click(await screen.findByRole('button',{name:'Use current location'}));expect(screen.queryByText('Nearby vase')).not.toBeInTheDocument();await act(async()=>complete({coords:{latitude,longitude:0,accuracy:10}} as GeolocationPosition));await userEvent.click(screen.getByRole('button',{name:'Use for discovery'}));await screen.findByText(latitude===0?'Nearby vase':'No products nearby');}expect(points.map(point=>point.location.latitude)).toEqual([0,1,0]);expect(points.every(point=>point.radius_km===3&&point.location.longitude===0)).toBe(true);});
 it('changes live backend radius without reacquiring location and ignores stale responses',async()=>{
   let finish!:(value:Reply)=>void;
   const bodies:any[]=[];
@@ -41,28 +42,6 @@ it('changes live backend radius without reacquiring location and ignores stale r
   expect(bodies.map(body=>body.radius_km)).toEqual([3,2,1,3]);
   expect(bodies.every(body=>body.location.latitude===19&&body.location.longitude===72)).toBe(true);
 });
-it('refreshes synthetic supported/unsupported/supported points without retaining old cards',async()=>{
-  const points:unknown[]=[];
-  setup((path,body)=>{
-    if(path==='/addresses')return [200,[]];
-    points.push(body);
-    return [200,body.location.latitude===0?[product]:[]];
-  });
-  await screen.findByLabelText('Latitude');
-  async function select(latitude:string,longitude:string){
-    await userEvent.clear(screen.getByLabelText('Latitude'));
-    await userEvent.type(screen.getByLabelText('Latitude'),latitude);
-    await userEvent.clear(screen.getByLabelText('Longitude'));
-    await userEvent.type(screen.getByLabelText('Longitude'),longitude);
-    expect(screen.queryByText('Nearby vase')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button',{name:'Use for discovery'}));
-  }
-  await select('0','0');await screen.findByText('Nearby vase');
-  await select('1','1');await screen.findByText('No products nearby');
-  expect(screen.queryByText('Nearby vase')).not.toBeInTheDocument();
-  await select('0','0');await screen.findByText('Nearby vase');
-  expect(points).toEqual([{location:{latitude:0,longitude:0},radius_km:3},{location:{latitude:1,longitude:1},radius_km:3},{location:{latitude:0,longitude:0},radius_km:3}]);
-});
 it('associates PIN guidance and styles the clear action as a secondary button',async()=>{
   setup(path=>path==='/addresses'?[200,[]]:[200,[]]);
   await screen.findByLabelText('PIN code');
@@ -71,9 +50,9 @@ it('associates PIN guidance and styles the clear action as a secondary button',a
   expect(screen.getByRole('button',{name:'Clear discovery location'})).toHaveClass('btn','btn-outline');
 });
 async function manual(){
-  await screen.findByLabelText('Latitude');
-  await userEvent.type(screen.getByLabelText('Latitude'),'19');
-  await userEvent.type(screen.getByLabelText('Longitude'),'72');
+  vi.stubGlobal('navigator',{geolocation:{getCurrentPosition:(success:PositionCallback)=>success({coords:{latitude:19,longitude:72,accuracy:20}} as GeolocationPosition)}});
+  await screen.findByRole('button',{name:'Use current location'});
+  await userEvent.click(screen.getByRole('button',{name:'Use current location'}));
   await userEvent.click(screen.getByRole('button',{name:'Use for discovery'}));
 }
 it('requires an explicit source, uses backend list/detail and adds real products to the cart',async()=>{
@@ -116,7 +95,7 @@ it('hides old results on draft edits and ignores their late response',async()=>{
   let finish!:(value:Reply)=>void;
   setup(path=>path==='/addresses'?[200,[]]:new Promise(resolve=>{finish=resolve;}));
   await manual();
-  await userEvent.clear(screen.getByLabelText('Latitude'));
+  await userEvent.click(screen.getByRole('button',{name:'Use current location'}));
   await act(async()=>finish([200,[product]]));
   expect(screen.queryByText('Nearby vase')).not.toBeInTheDocument();
   expect(screen.getByText('Location not set')).toBeInTheDocument();
@@ -181,7 +160,6 @@ it('re-detects into a fresh draft, clears old results and sends only the newly c
   await screen.findByText('Nearby vase');
   await userEvent.click(screen.getByRole('button',{name:'Use current location'}));
   expect(screen.queryByText('Nearby vase')).not.toBeInTheDocument();
-  expect(screen.getByLabelText('Latitude')).toHaveValue(null);
   expect(points).toHaveLength(1);
   await act(async()=>success({coords:{latitude:-20,longitude:73,accuracy:210}} as GeolocationPosition));
   expect(screen.getByText(/browser-reported accuracy: about 210 m/i)).toBeInTheDocument();

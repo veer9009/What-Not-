@@ -9,12 +9,14 @@ export interface BuyerProduct {
   category:Category;delivery_radius_km:1|2|3;image_url:string|null;
   shop_name:string;is_verified:boolean;delivery_eligibility?:'CONFIRMED_AT_CHECKOUT';
 }
-function sourceBody(source:DiscoverySource,radius:DiscoveryRadius):string {
+function sourceBody(source:DiscoverySource,radius:DiscoveryRadius,options?:{offset?:number;limit?:number;q?:string}):string {
   if(!Number.isInteger(radius)||![1,2,3].includes(radius))throw new ApiError(422,'Choose a discovery radius of 1, 2 or 3 km.');
   // An ID is validated decimal digits, emitted as a JSON integer without JS number rounding.
-  return 'address_id' in source ? `{"address_id":${identifier(source.address_id)},"radius_km":${radius}}` : JSON.stringify({...source,radius_km:radius});
+  const original='address_id' in source ? `{"address_id":${identifier(source.address_id)},"radius_km":${radius}}` : JSON.stringify({...source,radius_km:radius});
+  const extra=options?JSON.stringify(options).slice(1,-1):'';
+  return extra?original.slice(0,-1)+','+extra+'}':original;
 }
 export const discoveryApi = {
-  list:(source:DiscoverySource,radius:DiscoveryRadius=3)=>api<BuyerProduct[]>('/discovery/products',{method:'POST',bodyText:sourceBody(source,radius)}),
+  list:(source:DiscoverySource,radius:DiscoveryRadius=3,options?:{offset?:number;limit?:number;q?:string})=>api<BuyerProduct[]>('/discovery/products',{method:'POST',bodyText:sourceBody(source,radius,options)}),
   detail:(id:Id,source:DiscoverySource,radius:DiscoveryRadius=3)=>api<BuyerProduct>(`/discovery/products/${identifier(id)}`,{method:'POST',bodyText:sourceBody(source,radius)}),
 };

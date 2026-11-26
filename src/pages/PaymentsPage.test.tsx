@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
+import { Profiler } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PaymentsPage } from './PaymentsPage';
@@ -6,11 +7,27 @@ import { paymentsApi, type PaymentRecord } from '../api/payments';
 import { ApiError } from '../api/client';
 const account=vi.hoisted(()=>({role:'BUYER'}));
 vi.mock('../state/AuthContext',()=>({useAuth:()=>({user:{...account,id:'1',name:'Reviewer'},logout:vi.fn()})}));
-vi.mock('../api/payments',()=>({paymentsApi:{list:vi.fn(),metrics:vi.fn(),method:vi.fn(),report:vi.fn(),confirm:vi.fn()}}));
+vi.mock('../api/payments',()=>({paymentsApi:{list:vi.fn(),metrics:vi.fn(),method:vi.fn(),report:vi.fn(),confirm:vi.fn(),instructions:vi.fn(),summary:vi.fn()}}));
 const record:PaymentRecord={order_id:'9007199254740993',seller_id:'2',seller_name:'Local maker',amount:'549.00',currency:'INR',order_status:'ACCEPTED',order_date:'2026-11-24T00:00:00Z',method:null,status:'NOT_RECORDED',reference:null,reported_at:null,confirmed_at:null,can_select_method:true,can_report:false,can_confirm:false};
-beforeEach(()=>{account.role='BUYER';vi.mocked(paymentsApi.list).mockResolvedValue({items:[record],has_more:false});});
+beforeEach(()=>{account.role='BUYER';vi.mocked(paymentsApi.list).mockResolvedValue({items:[record],has_more:false});vi.mocked(paymentsApi.instructions).mockResolvedValue({available:false,reason:'Prepaid UPI is disabled.',upi_id:null,account_holder_name:null,amount:record.amount,currency:'INR',upi_uri:null,verification_label:null});vi.mocked(paymentsApi.summary).mockResolvedValue({currency:'INR',order_value:'549.00',confirmed_collections:'0.00',pending_cod_collections:'549.00',upi_awaiting_verification:'0.00',platform_revenue:'0.00',scope:'ALL_OWNED_ORDERS'});});
 afterEach(()=>vi.clearAllMocks());
 function open(){render(<MemoryRouter><PaymentsPage/></MemoryRouter>);}
+
+it.each(['BUYER','ADMIN'])('never commits previous-page records under the next page label for %s',async role=>{
+  account.role=role;
+  vi.mocked(paymentsApi.list).mockImplementation(offset=>offset?new Promise(()=>{}):Promise.resolve({items:[{...record,order_id:'1'}],has_more:true}));
+  vi.mocked(paymentsApi.metrics).mockResolvedValue(null as never);
+  const staleCommits:string[]=[];
+  render(<MemoryRouter><Profiler id="payments" onRender={()=>{
+    const page=document.querySelector('[aria-label="Payments pages"]')?.textContent??'';
+    if(page.includes('Page 2')&&document.getElementById('payment-order-1'))staleCommits.push(page);
+  }}><PaymentsPage/></Profiler></MemoryRouter>);
+  await screen.findByRole('heading',{name:'Order #1'});
+  fireEvent.click(screen.getByRole('button',{name:'Next page'}));
+  await waitFor(()=>expect(paymentsApi.list).toHaveBeenLastCalledWith(50));
+  expect(staleCommits).toEqual([]);
+  expect(screen.queryByRole('heading',{name:'Order #1'})).not.toBeInTheDocument();
+});
 
 it('records an explicit buyer method and never invents legacy payment details',async()=>{
   vi.mocked(paymentsApi.method).mockResolvedValue({...record,method:'COD',status:'PENDING',can_select_method:false});
@@ -25,16 +42,25 @@ it('records an explicit buyer method and never invents legacy payment details',a
 });
 
 it('shows COD and direct UPI as labelled choices with short descriptions and icons',async()=>{
+  vi.mocked(paymentsApi.list).mockResolvedValue({items:[{...record,available_payment_methods:['COD','UPI']}],has_more:false});
   open();await screen.findByText('Local maker');
   const choices=screen.getByRole('group',{name:'Payment method'});
   expect(within(choices).getByRole('radio',{name:/Cash on delivery/})).toBeInTheDocument();
   expect(within(choices).getByRole('radio',{name:/Direct UPI/})).toBeInTheDocument();
   expect(within(choices).getByText('Pay cash to your seller at delivery.')).toBeInTheDocument();
-  expect(within(choices).getByText('Pay your seller directly; report payment after acceptance.')).toBeInTheDocument();
+  expect(within(choices).getByText('Available only with approved policy and seller destination.')).toBeInTheDocument();
   expect(choices.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(2);
   fireEvent.click(within(choices).getByRole('radio',{name:/Direct UPI/}));
   fireEvent.submit(screen.getByRole('button',{name:'Record method'}).closest('form')!);
   await waitFor(()=>expect(paymentsApi.method).toHaveBeenCalledWith(record.order_id,'UPI'));
+});
+
+it('keeps historical UPI selection disabled unless the server explicitly allows it',async()=>{
+  open();await screen.findByText('Local maker');
+  expect(screen.getByRole('radio',{name:/Direct UPI/})).toBeDisabled();
+  fireEvent.click(screen.getByRole('radio',{name:/Direct UPI/}));
+  fireEvent.submit(screen.getByRole('button',{name:'Record method'}).closest('form')!);
+  expect(paymentsApi.method).not.toHaveBeenCalled();
 });
 
 it('validates an optional UPI reference and reports it without claiming verification',async()=>{

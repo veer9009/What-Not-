@@ -15,14 +15,11 @@ it('exports actual rendered discovery markup with synthetic fixtures for offline
     const path=new URL(input,location.origin).pathname.replace('/api/v1','');
     const body=path==='/auth/me'?{id:1,name:'QA Buyer',email:'chrome-buyer@example.com',role:'BUYER'}:
       path==='/addresses'?[{id:4,user_id:1,label:'QA Home',address_line1:'Synthetic fixture',city:'QA',state:'QA',pincode:'999999',latitude:'0',longitude:'0',is_default:true}]:
-      path==='/discovery/products'?[product,{...product,id:5,name:'QA Nearby Basket',price:'125.50'}]:[];
+      path==='/discovery/products'?[product,{...product,id:5,name:'QA Nearby Basket',price:'125.50'}]:path==='/wishlist'?{items:[],count:0}:path==='/notifications/unread-count'?{count:0}:[];
     return new Response(JSON.stringify(body),{status:200});
   }));
   render(<MemoryRouter initialEntries={['/buyer']}><App/></MemoryRouter>);
-  await screen.findByLabelText('Latitude');
-  await userEvent.type(screen.getByLabelText('Latitude'),'0');
-  await userEvent.type(screen.getByLabelText('Longitude'),'0');
-  await userEvent.click(screen.getByRole('button',{name:'Use for discovery'}));
+  await userEvent.click(await screen.findByRole('button',{name:'Use QA Home for discovery'},{timeout:15000}));
   await screen.findByText('QA Nearby Vase');
   await screen.findByRole('button',{name:'Use QA Home for discovery'});
   writeFileSync('docs/security/evidence/discovery-layout-fixture.html',document.body.innerHTML);

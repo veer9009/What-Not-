@@ -94,7 +94,7 @@ export function parseJson(text: string): unknown {
     return value;
   });
   return JSON.parse(exact, (key, value) => {
-    if ((key === 'id' || key.endsWith('_id')) && (typeof value === 'number' || typeof value === 'string')) {
+    if ((key === 'id' || (key.endsWith('_id') && key !== 'upi_id')) && (typeof value === 'number' || typeof value === 'string')) {
       const id = String(value);
       if (!/^[1-9]\d*$/.test(id) || BigInt(id) > 9223372036854775807n) throw new Error('Invalid identifier');
       return id;
@@ -106,7 +106,7 @@ export function identifier(id: string) {
   if (!/^[1-9]\d*$/.test(id) || BigInt(id) > 9223372036854775807n) throw new ApiError(404, messages[404]);
   return id;
 }
-interface Options { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; bodyText?: string; auth?: boolean; signal?: AbortSignal; idempotencyKey?: string }
+interface Options { method?: 'GET' | 'POST' | 'PUT' | 'PATCH'; body?: unknown; bodyText?: string; auth?: boolean; signal?: AbortSignal; idempotencyKey?: string }
 export async function api<T>(path: string, { method = 'GET', body, bodyText, auth = true, signal, idempotencyKey }: Options = {}): Promise<T> {
   if (!path.startsWith('/') || path.startsWith('//') || /^\/api(?:\/|$)/.test(path)) {
     throw new Error('Invalid API path: supply an endpoint without the API prefix.');

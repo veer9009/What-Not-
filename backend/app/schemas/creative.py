@@ -4,16 +4,20 @@ from uuid import UUID
 from pydantic import Field, HttpUrl, AwareDatetime, model_validator
 from app.schemas.common import ContractModel, Price
 
-Category = Literal['Video Editing','Travel Video Editing','Influencer Reel Editing','VFX']
+Domain = Literal['CREATIVE', 'PROFESSIONAL']
+CREATIVE_CATEGORIES = ('Video Editing', 'Travel Video Editing', 'Influencer Reel Editing', 'VFX', 'Photography', 'Videography', 'Graphic Design', 'Animation and VFX', 'Fashion Design', 'Logo and Branding Design', 'Advertisement Production', 'Promotional Video Production', 'Digital Marketing')
+PROFESSIONAL_CATEGORIES = ('Website Development', 'Mobile Application Development', 'Custom Software Development', 'Portfolio Development', 'E-commerce Development', 'CRM and ERP Solutions', 'AI and Automation', 'Cloud and DevOps', 'Software Maintenance', 'IT Consulting', 'Cybersecurity Services', 'API Development and Integration')
+CATEGORIES = {'CREATIVE': CREATIVE_CATEGORIES, 'PROFESSIONAL': PROFESSIONAL_CATEGORIES}
 
 class ProviderInput(ContractModel):
     display_name: str = Field(min_length=1, max_length=120)
     bio: str = Field(min_length=1, max_length=5000)
 
 class ListingInput(ContractModel):
+    domain: Domain = 'CREATIVE'
     title: str = Field(min_length=1, max_length=120)
     description: str = Field(min_length=1, max_length=5000)
-    category: Category
+    category: str = Field(min_length=1, max_length=40)
     pricing: Literal['FIXED', 'STARTING', 'HOURLY', 'QUOTATION']
     amount: Price | None = None
     currency: Literal['INR'] = 'INR'
@@ -24,6 +28,8 @@ class ListingInput(ContractModel):
 
     @model_validator(mode='after')
     def requirements(self):
+        if self.category not in CATEGORIES[self.domain]:
+            raise ValueError('Category does not belong to this domain')
         if (self.pricing == 'QUOTATION') != (self.amount is None):
             raise ValueError('Quotation requires no advertised amount; other pricing requires an amount')
         if not self.remote and not self.locality:

@@ -35,8 +35,8 @@ export function ShopProfileForm({shop,reload,saved,onPartialSave}:{shop:Shop|nul
       if(!mounted.current||acquisition.current!==request)return;
       setForm(current=>({...current,latitude:String(point.latitude),longitude:String(point.longitude)}));
       setFields(current=>({...current,latitude:'',longitude:''}));
-      setLocationStatus('Shop location selected. Confirm it below, then save. Nothing has been saved or publicly shared.');
-    }catch(reason){if(mounted.current&&acquisition.current===request){setLocationStatus('');setLocationError(reason instanceof LocationError?reason.message:'Location is unavailable. Use the manual fallback.');}}
+      setLocationStatus(`Shop location selected. Confirm it below, then save. Nothing has been saved or publicly shared. ${point.accuracyMeters===null?'Browser accuracy is unavailable.':`Browser-reported accuracy: about ${Math.ceil(point.accuracyMeters)} m.`}`);
+    }catch(reason){if(mounted.current&&acquisition.current===request){setLocationStatus('');setLocationError(reason instanceof LocationError?reason.message:'Location is unavailable. Try again.');}}
     finally{if(acquisition.current===request){acquisition.current=null;if(mounted.current)setLocating(false);}}
   }
   async function submit(event:FormEvent){
@@ -80,11 +80,8 @@ export function ShopProfileForm({shop,reload,saved,onPartialSave}:{shop:Shop|nul
         <section aria-label="Shop location"><h2>Where do you send products from?</h2>
           <p id="profile-location-help">Choose your actual shop location. It may differ from your current device location.</p>
           <button type="button" className="btn btn-outline btn-sm" aria-describedby="profile-location-help" disabled={locating} onClick={()=>void locate()}>{locating?'Detecting location...':'Use Current Location'}</button>
+          {locating&&<button type="button" className="btn btn-outline btn-sm" onClick={()=>{acquisition.current?.abort();acquisition.current=null;setLocating(false);setLocationStatus('Location request cancelled.');}}>Cancel location request</button>}
           {locationStatus&&<p role="status">{locationStatus}</p>}{locationError&&<ErrorNotice message={locationError}/>}
-          <details><summary>Enter coordinates manually</summary><p>Use this fallback if device location is unavailable. A PIN code alone cannot identify an exact location.</p><div className="form-grid">
-            <Field label="Latitude" name="latitude" value={form.latitude} onChange={value=>set('latitude',value)} type="number" step="0.000001" min={-90} max={90} error={fields.latitude}/>
-            <Field label="Longitude" name="longitude" value={form.longitude} onChange={value=>set('longitude',value)} type="number" step="0.000001" min={-180} max={180} error={fields.longitude}/>
-          </div></details>
           {!needsConfirmation&&<p>Saved dispatch location confirmed. New products use it automatically.</p>}
           {needsConfirmation&&<label className="public-point-consent"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>I confirm this is where I send products from.</label>}
           {needsPublicConsent&&<><p>Nearby discovery needs a public shop point. If this is a private home, leave this unchecked and choose a different public point below after saving.</p><label className="public-point-consent"><input type="checkbox" checked={sharePublic} onChange={event=>setSharePublic(event.target.checked)}/>I agree to use this point for public discovery. Buyers may infer this location.</label></>}

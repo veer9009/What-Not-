@@ -35,11 +35,12 @@ it.each([['BUYER','/admin/operations'],['SELLER','/admin/operations'],['BUYER','
   vi.stubGlobal('fetch',vi.fn(async(input:string)=>{
     const requestPath=new URL(input, location.origin).pathname.replace('/api/v1','');
     requests.push(requestPath);
-    return new Response(JSON.stringify({id:2,name:'Test user',email:'test@example.test',role}),{status:200});
+    return new Response(JSON.stringify(requestPath==='/wishlist'?{items:[],count:0}:{id:2,name:'Test user',email:'test@example.test',role}),{status:200});
   }));
   render(<MemoryRouter initialEntries={[path]}><App/></MemoryRouter>);
   await screen.findByRole('heading',{name:'This page is not available for your account.'});
-  expect(requests).toEqual(['/auth/me']);
+  expect(requests.filter(path=>path==='/auth/me')).toHaveLength(1);
+  expect(requests.every(path=>['/auth/me','/wishlist'].includes(path))).toBe(true);
 });
 
 it('approves the exact creative listing version the admin reviewed',async()=>{

@@ -1,4 +1,4 @@
-import { ArrowRight, HousePlus, Palette, ShoppingBasket } from 'lucide-react';
+import { ArrowRight, Code2, HousePlus, Palette, ShoppingBasket } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -38,6 +38,14 @@ export function ExploreVerticals({live=false}:{live?:boolean}) {
         <ul className="vertical-examples"><li>Video editing</li><li>Travel video editing</li><li>Influencer reel editing</li><li>VFX service</li></ul>
         <p className="vertical-limit">Browse services, request a quote and confirm completed work. No payment or escrow is collected.</p>
         <Link className="btn btn-outline vertical-action" to="/buyer/creative">Explore Creative Services</Link>
+      </article>
+      <article className="vertical-card professional-category" id="professional-services" aria-labelledby="professional-heading">
+        <div className="vertical-card-top"><Code2 size={28} aria-hidden="true"/><span className="scope-badge">Controlled beta</span></div>
+        <h3 id="professional-heading">Professional Services</h3>
+        <p>Software, cloud and technical expertise.</p>
+        <ul className="vertical-examples"><li>Website and app development</li><li>AI and automation</li><li>Cloud and DevOps</li><li>IT consulting</li></ul>
+        <p className="vertical-limit">Request a private quotation from an approved service. No payment or escrow is collected.</p>
+        <Link className="btn btn-outline vertical-action" to="/buyer/professional">Explore Professional Services</Link>
       </article>
     </div>
   </section>;

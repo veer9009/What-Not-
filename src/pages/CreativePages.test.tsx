@@ -9,9 +9,26 @@ import { ApiError } from '../api/client';
 const render = (ui: ReactNode) => renderUI(<MemoryRouter>{ui}</MemoryRouter>);
 vi.mock('../components/Shared',()=>({DashboardShell:({children}:{children:ReactNode})=><main>{children}</main>,PageTop:({title}:{title:string})=><h1>{title}</h1>}));
 vi.mock('../state/AuthContext',()=>({useAuth:()=>({user:{id:'1'}})}));
-vi.mock('../api/creative',()=>({creativeApi:{listings:vi.fn(),own:vi.fn(),rfqs:vi.fn(),engagements:vi.fn(),provider:vi.fn(),complete:vi.fn(),deliver:vi.fn(),create:vi.fn(),update:vi.fn(),enquire:vi.fn(),respond:vi.fn(),responses:vi.fn()}}));
+vi.mock('../api/creative',()=>({creativeApi:{listings:vi.fn(),own:vi.fn(),rfqs:vi.fn(),engagements:vi.fn(),provider:vi.fn(),dashboard:vi.fn(),reviews:vi.fn(),complete:vi.fn(),deliver:vi.fn(),create:vi.fn(),update:vi.fn(),enquire:vi.fn(),respond:vi.fn(),responses:vi.fn()}}));
 beforeEach(()=>{vi.mocked(creativeApi.listings).mockResolvedValue([]);vi.mocked(creativeApi.own).mockResolvedValue([]);vi.mocked(creativeApi.rfqs).mockResolvedValue([]);vi.mocked(creativeApi.provider).mockResolvedValue(null);});
 afterEach(()=>{cleanup();sessionStorage.clear();vi.clearAllMocks();});
+it('hides previous private projects while the next workspace page loads',async()=>{
+  const projects=Array.from({length:50},(_,index)=>({id:String(index+1),rfq_id:'1',response_id:'2',title:`Project ${index}`,terms:'Scope',amount:'100',currency:'INR',status:'ACCEPTED' as const}));
+  vi.mocked(creativeApi.engagements).mockResolvedValueOnce(projects).mockReturnValueOnce(new Promise(()=>{}));
+  render(<SellerCreativePage/>);
+  expect(await screen.findByText('Project 0')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Next page'}));
+  await waitFor(()=>expect(screen.queryByText('Project 0')).not.toBeInTheDocument());
+});
+it('shows real professional dashboard totals and reviews',async()=>{
+  vi.mocked(creativeApi.engagements).mockResolvedValue([]);
+  vi.mocked(creativeApi.dashboard).mockResolvedValue({active_services:4,pending_approvals:3,new_enquiries:2,submitted_quotations:1,ongoing_projects:5,completed_projects:6});
+  vi.mocked(creativeApi.reviews).mockResolvedValue([{id:'8',engagement_id:'9',listing_id:'3',rating:5,comment:'Excellent work',created_at:'2026-11-25'}]);
+  render(<SellerCreativePage domain="PROFESSIONAL"/>);
+  expect(await screen.findByText('Excellent work')).toBeInTheDocument();
+  expect(screen.getByText('Active services').previousElementSibling).toHaveTextContent('4');
+  expect(creativeApi.dashboard).toHaveBeenCalledWith('PROFESSIONAL');
+});
 it('buyer confirms delivered work and reloads authoritative completion',async()=>{
   vi.mocked(creativeApi.engagements).mockResolvedValueOnce([{id:'9007199254740993',rfq_id:'1',response_id:'2',title:'Logo',terms:'Final files',amount:'120',currency:'INR',status:'DELIVERED'}]).mockResolvedValue([{id:'9007199254740993',rfq_id:'1',response_id:'2',title:'Logo',terms:'Final files',amount:'120',currency:'INR',status:'COMPLETED',reviewed:true}]);
   vi.mocked(creativeApi.complete).mockResolvedValue({} as never);

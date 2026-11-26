@@ -20,6 +20,9 @@ class OrderPayment(TimestampMixin, Base):
     __tablename__='order_payments'
     __table_args__=tuple(CheckConstraint(sql,name=name) for name,sql in PAYMENT_CHECKS.items())
     order_id: Mapped[int]=mapped_column(BigInteger,ForeignKey('orders.id',ondelete='RESTRICT'),primary_key=True)
+    destination_upi_id: Mapped[str|None]=mapped_column(String(255))
+    destination_name: Mapped[str|None]=mapped_column(String(120))
+    destination_revision: Mapped[int|None]=mapped_column()
     method: Mapped[str]=mapped_column(String(3))
     status: Mapped[str]=mapped_column(String(24))
     reference: Mapped[str|None]=mapped_column(String(100))

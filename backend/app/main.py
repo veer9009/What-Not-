@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes import admin, auth, health, orders, products, addresses, sellers, discovery
-from app.api.routes import notifications, properties, creative, product_images, payments
+from app.api.routes import notifications, properties, creative, product_images, payments, checkout, wishlist
 from app.api.errors import install_error_handlers
 from app.core.config import Settings
 
@@ -47,13 +47,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application.add_middleware(
         CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,
-        allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "Idempotency-Key", "X-WhatNot-CSRF"],
     )
     if settings.trusted_hosts:
         application.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts,
                                    www_redirect=False)
-    for router in (health.router, auth.router, products.router, orders.router, admin.router, addresses.router, sellers.router, discovery.router, notifications.router, properties.router, creative.router, product_images.router, payments.router):
+    for router in (health.router, auth.router, products.router, orders.router, admin.router, addresses.router, sellers.router, discovery.router, notifications.router, properties.router, creative.router, product_images.router, payments.router, checkout.router, wishlist.router):
         application.include_router(router, prefix="/api/v1")
     return application
 

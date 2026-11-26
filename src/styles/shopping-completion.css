@@ -1,0 +1,20 @@
+.shopping-payment-settings { max-width: 52rem; min-width: 0; overflow-wrap: anywhere; }
+.shopping-payment-settings label { display: grid; gap: .5rem; }
+.shopping-payment-settings .checkbox-field { display:flex; align-items:center; }
+.shopping-payment-settings input:not([type=checkbox]), .shopping-payment-settings textarea { width:100%; min-width:0; padding:.85rem; border:1px solid var(--color-border); border-radius:.7rem; }
+.shopping-payment-settings textarea { min-height:6rem; resize:vertical; }
+.payment-review-state { display:flex; align-items:center; gap:.5rem; font-weight:700; }
+.payment-feature-notice { background:var(--color-primary-soft); border-radius:.7rem; padding:1rem; }
+.order-payment-panel { margin-block:1.25rem; padding:1.2rem; border:1px solid var(--color-border); border-radius:1rem; min-width:0; overflow-wrap:anywhere; }
+.order-payment-panel h2, .order-receipt h2 { font-size:1.45rem; }
+.payment-qr { width:min(100%,16rem); background:white; padding:.75rem; }
+.payment-qr svg { display:block; width:100%; height:auto; }
+.order-receipt { margin-block:1.5rem; overflow-wrap:anywhere; }
+.order-receipt dl { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:.6rem; }
+.order-receipt dd { margin:0; }
+.order-receipt table { width:100%; border-collapse:collapse; table-layout:fixed; }
+.order-receipt th, .order-receipt td { text-align:left; padding:.6rem .25rem; overflow-wrap:anywhere; }
+@media(max-width:520px){.order-receipt dl{grid-template-columns:1fr}.shopping-payment-settings .form-actions{display:grid;grid-template-columns:1fr}.order-receipt th,.order-receipt td{font-size:.78rem}}
+@media print {.app-sidebar,.workspace-mobile-header,.mobile-navigation,.whatsapp,footer,button{display:none!important}.dash-shell{display:block!important}.dash-shell>main{margin:0!important;padding:0!important}.order-receipt{break-inside:avoid}}
+.workspace-mobile-header .workspace-context{flex:1;min-width:0;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.workspace-mobile-header .notification-bell{flex-shrink:0}
