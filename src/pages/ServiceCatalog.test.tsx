@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { PublicServiceCatalog, ServiceCatalog, categories } from './ServiceCatalog';
 import { creativeApi, type CreativeListing } from '../api/creative';
@@ -28,8 +28,13 @@ it.each(['CREATIVE','PROFESSIONAL'] as const)('offers distinct local artwork and
   render(<MemoryRouter><ServiceCatalog domain={domain}/></MemoryRouter>);
   await screen.findByText('No services match your search.');
   const sources=new Set<string>();
-  for(const category of categories[domain]){
-    const button=screen.getByRole('button',{name:category});
+  // Traverse visible category roles once; repeated full-document role/name
+  // queries spend the test budget recomputing jsdom styles for every button.
+  const buttons=within(screen.getByLabelText(`${domain==='CREATIVE'?'Creative':'Professional'} Services categories`)).getAllByRole('button');
+  expect(buttons).toHaveLength(categories[domain].length);
+  for(const [index,category] of categories[domain].entries()){
+    const button=buttons[index];
+    expect(button).toHaveAccessibleName(category);
     const image=button.querySelector('img');
     expect(image).not.toBeNull();
     sources.add(image!.getAttribute('src')!);

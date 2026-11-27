@@ -85,9 +85,14 @@ def login(payload: LoginRequest, request: Request, response: Response, session: 
 def refresh(request: Request, response: Response, session: TransactionSession):
     settings = request.app.state.settings
     signing_key(settings)
-    source = request.client.host if request.client else 'unknown'
-    check_action_limit(session, settings, 'auth', f'source:{source}')
-    result = RefreshSessionService(session).rotate(request.cookies.get(REFRESH_COOKIE))
+    raw_cookie = request.cookies.get(REFRESH_COOKIE)
+    result = None
+    if raw_cookie:
+        # Anonymous page restoration has no credential to authenticate. Charging
+        # it to the login budget can block sign-in after ordinary page browsing.
+        source = request.client.host if request.client else 'unknown'
+        check_action_limit(session, settings, 'auth', f'source:{source}')
+        result = RefreshSessionService(session).rotate(raw_cookie)
     if result is None:
         # Returning, rather than raising, preserves replay/suspension revocation.
         denied = JSONResponse({'detail': 'Invalid authentication credentials'}, status_code=401,

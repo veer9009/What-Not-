@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ProductFormPage, SellerDashboard, SellerProfilePage } from './SellerPages';
@@ -146,12 +146,21 @@ it('counts only approved active stocked listings after complete location setup',
 it('creates multiple products using one saved shop configuration without location prompts or writes', async () => {
   const create = vi.spyOn(productsApi,'create').mockResolvedValue(product);
   render(<MemoryRouter initialEntries={['/seller']}><Routes><Route path="/seller" element={<SellerDashboard/>}/><Route path="/seller/products/new" element={<ProductFormPage/>}/></Routes></MemoryRouter>);
+  function page() {
+    const main=document.getElementById('main-content')!;
+    expect(main).toHaveRole('main');
+    return within(main);
+  }
+  // Sidebar navigation is unrelated to this flow; query the current main and
+  // reuse the returned action instead of finding it again before the next click.
+  let add=await waitFor(()=>page().getByRole('link', {name:'Add New Product'}));
   for (let attempt=0; attempt<2; attempt++) {
-    fireEvent.click(await screen.findByRole('link', {name:'Add New Product'}));
-    const button = await screen.findByRole('button', {name:'Submit for Admin Approval'});
+    fireEvent.click(add);
+    const button = await waitFor(()=>page().getByRole('button', {name:'Submit for Admin Approval'}));
     expect(screen.queryByLabelText('Latitude')).not.toBeInTheDocument();
     fireEvent.submit(button.closest('form')!);
-    await screen.findByRole('link', {name:'Add New Product'});
+    // Navigation replaces main, so resolve the live landmark on every retry.
+    add=await waitFor(()=>page().getByRole('link', {name:'Add New Product'}));
   }
   expect(create).toHaveBeenCalledTimes(2);
   expect(setDispatchLocation).not.toHaveBeenCalled(); expect(setPublicDiscovery).not.toHaveBeenCalled();

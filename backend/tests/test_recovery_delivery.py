@@ -126,6 +126,7 @@ def test_smtp_child_deadline_survives_worker_death():
     """
     import ctypes
     import json
+    from pathlib import Path
     import subprocess
     import sys
     from ctypes import wintypes
@@ -149,7 +150,8 @@ child.stdin.close()
 time.sleep(60)
 """
     parent = subprocess.Popen([sys.executable, '-c', parent_code, child_code],
-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, creationflags=subprocess.CREATE_NO_WINDOW,
+        cwd=Path(__file__).resolve().parents[1])
     kernel = ctypes.WinDLL('kernel32', use_last_error=True)
     kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     kernel.OpenProcess.restype = wintypes.HANDLE

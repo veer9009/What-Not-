@@ -70,6 +70,7 @@ class RecoverySMTPProvider:
     def send(self, recipient, title, body, idempotency_key):
         import json
         import os
+        from pathlib import Path
         import subprocess
         import sys
         import time
@@ -84,6 +85,7 @@ class RecoverySMTPProvider:
             result = subprocess.run([sys.executable, '-m', 'app.recovery_smtp', str(deadline)], input=payload,
                 text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 timeout=settings.recovery_smtp_deadline_seconds,
+                cwd=Path(__file__).resolve().parents[2],
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
         except (subprocess.TimeoutExpired, OSError):
             raise MailFailure('SMTP_DEADLINE') from None

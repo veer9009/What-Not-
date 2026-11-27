@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { propertyDraft, reportReasons, PropertyDetailPage, PropertyRequestsPage, PropertyModerationPage, PropertyManagePage } from './PropertyPages';
@@ -19,15 +19,22 @@ it('uses accessible grouped property forms and readable public/private guidance'
   expect(container.textContent).not.toMatch(/[ÂÃâ]/);
 });
 it('submits public listing fields and the separate private address for moderation',async()=>{
+  // Exercise normal user entry without rendering the entire page once per
+  // character; this test checks submission fields rather than keyboard handling.
+  const user=userEvent.setup({delay:null});
   vi.spyOn(propertiesApi,'mine').mockResolvedValue([]);
   vi.spyOn(propertiesApi,'profile').mockResolvedValue({display_name:'Owner',capacity:'OWNER',share_contact:false});
   const create=vi.spyOn(propertiesApi,'create').mockResolvedValue({} as never);
   render(<MemoryRouter><PropertyManagePage/></MemoryRouter>);
-  await screen.findByLabelText('Title');
+  const title=await screen.findByLabelText('Title');
+  const form=title.closest('form')!;
+  expect(form).toHaveAccessibleName('Create sale listing');
+  const listing=within(form);
   for(const [label,value] of [['Title','Sale home'],['Description','A quiet home'],['Price (₹)','100'],['Approximate public locality','Pune'],['Private postal address','123 Private Lane']]){
-    await userEvent.type(screen.getByLabelText(label),value);
+    await user.click(listing.getByLabelText(label));
+    await user.paste(value);
   }
-  await userEvent.click(screen.getByRole('button',{name:'Submit for moderation'}));
+  await user.click(listing.getByRole('button',{name:'Submit for moderation'}));
   await waitFor(()=>expect(create).toHaveBeenCalledWith({title:'Sale home',description:'A quiet home',category:'Residential',price:'100',locality:'Pune',private_address:'123 Private Lane'}));
   await screen.findByText('Saved.');
   expect(screen.getByLabelText('Private postal address')).toHaveValue('');
@@ -64,7 +71,9 @@ it('sends a private enquiry and keeps private address absent from public details
   render(<MemoryRouter initialEntries={['/buyer/properties/9']}><Routes><Route path="/buyer/properties/:id" element={<PropertyDetailPage/>}/></Routes></MemoryRouter>);
   await screen.findByText('Sale home');
   expect(screen.queryByText('Private postal address')).not.toBeInTheDocument();
-  await userEvent.type(screen.getByLabelText('Enquiry'),'Is this available?');
+  const user=userEvent.setup({delay:null});
+  await user.click(screen.getByLabelText('Enquiry'));
+  await user.paste('Is this available?');
   await userEvent.click(screen.getByRole('button',{name:'Send enquiry'}));
   await waitFor(()=>expect(command).toHaveBeenCalledWith('9','enquiries',{message:'Is this available?'}));
   expect(await screen.findByText('Saved.')).toBeInTheDocument();

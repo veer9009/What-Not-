@@ -111,6 +111,32 @@ def test_release_identity_is_checked_before_executable_dependencies(module):
     assert module.CHECKS.index('release') < module.CHECKS.index('tools')
 
 
+@pytest.mark.parametrize('version,accepted', [('3.14.10', True), ('3.14.4', False)])
+def test_tools_requires_patched_python_baseline_offline(setup, monkeypatch, version, accepted):
+    executable = setup.release / 'backend' / 'synthetic-python'
+    executable.touch()  # Path check only; FakeRunner never executes this file.
+    setup.inv['release_python'] = str(executable)
+    checks = []
+    monkeypatch.setattr(setup.checker, 'release', lambda: checks.append('release'))
+    monkeypatch.setattr(setup.checker, 'dependencies', lambda: checks.append('dependencies'))
+    monkeypatch.setattr(setup.module.shutil, 'which', lambda tool: '/offline-stub/' + tool)
+    for tool in ('psql', 'pg_restore'):
+        setup.runner.responses[(tool, '--version')] = tool + ' (PostgreSQL) 18.1\n'
+    setup.runner.responses[(str(executable), '-I', '-B', '-c',
+        'import sys; print(".".join(map(str, sys.version_info[:3])))')] = version + '\n'
+    pip_check = (str(executable), '-I', '-B', '-m', 'pip', 'check')
+    setup.runner.responses[pip_check] = 'No broken requirements found.\n'
+    if accepted:
+        setup.checker.tools()
+        assert checks == ['release', 'dependencies']
+        assert tuple(setup.runner.calls[-1][0]) == pip_check
+    else:
+        with pytest.raises(setup.module.Blocker):
+            setup.checker.tools()
+        assert checks == ['release']
+        assert all(tuple(call[0]) != pip_check for call in setup.runner.calls)
+
+
 def test_git_process_filters_are_rejected_before_status(setup):
     release_responses(setup)
     setup.runner.responses[('git', '-C', str(setup.release), 'config', '--includes', '--null', '--list')] = 'filter.unsafe.process\nsecret-command\0'

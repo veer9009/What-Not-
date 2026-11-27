@@ -1,11 +1,11 @@
 # What Not? PostgreSQL foundation — Phase 3
 
-Current beta head is **0008**, a single chain through 0005 shared/order events,
-0006 sale properties, 0007 Creative Services and 0008 quotas/account verification.
-Original 0001–0004 are unchanged. See [beta runbook](../docs/BETA_RUNBOOK.md) for the
-coordinated migration/backup procedure and retention-based rollback refusals.
-Fresh isolated upgrades and metadata checks are required; this work never migrates
-the application database. Remaining phase notes below describe earlier revisions.
+The repository schema head is **0015**. The localhost readiness audit verified
+the development database at this revision after a backed-up migration rehearsal;
+all 232 original rows were preserved. This does not establish the revision of any
+deployed database. See [beta runbook](../docs/BETA_RUNBOOK.md) for the coordinated
+migration/backup procedure and retention-based rollback refusals. Remaining phase
+notes below describe earlier revisions, including their older schema heads.
 
 Phase 7 current schema revision is **0002**: a nullable timezone-aware
 seller_profiles.dispatch_location_confirmed_at, without default/backfill. Existing
@@ -153,10 +153,13 @@ use it through request dependencies; startup does not migrate/create anything.
 
 ## Environment configuration
 
-Use Python 3.10+ and PostgreSQL 17. From `backend/`:
+Use Python 3.14.10 and the configured local PostgreSQL installation. Create a fresh
+`.venv` with that interpreter (`<python-3.14.10> -m venv .venv`); verify its version
+before installing. From `backend/`:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe --version
+.\.venv\Scripts\python.exe -m pip install -r requirements-bootstrap.txt -r requirements.lock
 ```
 
 If no `.env` exists, copy `.env.example` to `.env`. Preserve existing settings.

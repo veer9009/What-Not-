@@ -239,7 +239,7 @@ class Preflight:
         require(executable.is_absolute() and executable.is_file()
                 and executable.absolute().is_relative_to(self.root))
         require(self.runner.run([str(executable), '-I', '-B', '-c',
-            'import sys; print(".".join(map(str, sys.version_info[:3])))']).strip() == '3.14.4')
+            'import sys; print(".".join(map(str, sys.version_info[:3])))']).strip() == '3.14.10')
         self.runner.run([str(executable), '-I', '-B', '-m', 'pip', 'check'], timeout=60)
         self.dependencies()
 

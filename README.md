@@ -25,7 +25,10 @@ Historical phase reports below describe earlier revisions, not current readiness
 
 ## Run locally
 
-Use the existing Node/pnpm frontend and Python 3.10+ backend dependencies.
+Use the existing Node/pnpm frontend and Python 3.14.10 backend. The security
+baseline is pinned in `backend/requirements-bootstrap.txt` and the complete
+resolved environment in `backend/requirements.lock`; install both into a fresh
+virtual environment. Do not reuse an older environment with stale packages.
 
 ```powershell
 # Repository root: first setup only

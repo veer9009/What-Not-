@@ -7,6 +7,9 @@ vite.config.js
 vite.config.d.ts
 package-lock.json
 backend/.venv/
+backend/.venv-secure/
+backend/.venv-legacy-20261127/
+backend/.runtime-python/
 backend/.private-product-images/
 __pycache__/
 .pytest_cache/

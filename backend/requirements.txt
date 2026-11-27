@@ -1,4 +1,4 @@
-# Tested with Python 3.10.11. Runtime and test dependencies only.
+# Python 3.14.10 security baseline. Runtime and test dependencies only.
 fastapi==0.143.0
 starlette==1.7.0
 pydantic==2.14.0
@@ -15,6 +15,10 @@ argon2-cffi==25.1.0
 PyJWT==2.15.1
 # Existing internal bcrypt hashes are upgraded to Argon2id on successful login.
 bcrypt==5.0.0
-Pillow==12.3.0
+Pillow==13.0.0
 boto3==1.44.3
-cryptography==49.0.0
+cryptography==50.0.2
+# Pin security-sensitive transitive dependencies as well as direct imports.
+certifi==2026.11.20
+dnspython==2.9.2
+opentelemetry-api==1.45.2

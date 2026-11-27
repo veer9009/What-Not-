@@ -89,6 +89,7 @@ def main():
     report = recovery / 'rehearsal-evidence.json'
     stage = 'preflight'
     started = False
+    shutdown_failed = False
     target = None
 
     def save(name, value):
@@ -337,7 +338,9 @@ def main():
                 save('rehearsal_shutdown', {'status':'PASS','data_retained':True})
             except Exception:
                 save('rehearsal_shutdown', {'status':'FAIL','data_retained':True})
-                return 1
+                shutdown_failed = True
+    if shutdown_failed:
+        return 1
     print(json.dumps({'result':'REHEARSAL_PASS','evidence_path':str(report)}), flush=True)
     return 0
 

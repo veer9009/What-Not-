@@ -5,6 +5,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { getAccessToken, setAccessToken } from './api/client';
 
+// These route contracts check submitted credentials, validation and identity.
+// Pasting is normal user entry and avoids a page render/timer per character.
+async function enterText(element: HTMLElement, value: string) {
+  const user = userEvent.setup({delay:null});
+  await user.click(element);
+  await user.paste(value);
+}
+
 export const account = (role='BUYER') => ({ id: 1, name: 'Ravi', email: 'ravi@example.test', role });
 export function mockApi(handler: (path: string, method: string, body: any) => [number, unknown]) {
   const fetcher=vi.fn(async (input: string, options: RequestInit) => {
@@ -60,8 +68,8 @@ describe('authenticated marketplace routes', () => {
       ? [200, { access_token: 'test-token', expires_in: 900, token_type: 'bearer', user: account('BUYER') }]
       : path === '/auth/me' ? [200, account('ADMIN')] : [200, []]);
     open('/admin/login');
-    await userEvent.type(screen.getByLabelText('Email'), 'ravi@example.test');
-    await userEvent.type(screen.getByLabelText('Password'), crypto.randomUUID());
+    await enterText(screen.getByLabelText('Email'), 'ravi@example.test');
+    await enterText(screen.getByLabelText('Password'), crypto.randomUUID());
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByText('admin workspace');
     expect(fetcher.mock.calls.map(([url]) => new URL(url, location.origin).pathname)).toContain('/api/v1/auth/me');
@@ -74,8 +82,8 @@ describe('authenticated marketplace routes', () => {
       ? [200, { access_token: 'test-token', expires_in: 900, token_type: 'bearer', user: account('ADMIN') }]
       : path === '/auth/me' ? [200, account(role)] : path === '/sellers/me' ? [404, {}] : [200, []]);
     open('/admin/login');
-    await userEvent.type(screen.getByLabelText('Email'), 'ravi@example.test');
-    await userEvent.type(screen.getByLabelText('Password'), crypto.randomUUID());
+    await enterText(screen.getByLabelText('Email'), 'ravi@example.test');
+    await enterText(screen.getByLabelText('Password'), crypto.randomUUID());
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByText(role==='SELLER'?'Seller Studio':`${role.toLowerCase()} workspace`);
     expect(screen.queryByText('admin workspace')).not.toBeInTheDocument();
@@ -91,8 +99,8 @@ describe('authenticated marketplace routes', () => {
   it('reports admin authentication failure without retaining the password or token', async () => {
     mockApi(() => [401, {}]);
     open('/admin/login');
-    await userEvent.type(screen.getByLabelText('Email'), 'ravi@example.test');
-    await userEvent.type(screen.getByLabelText('Password'), crypto.randomUUID());
+    await enterText(screen.getByLabelText('Email'), 'ravi@example.test');
+    await enterText(screen.getByLabelText('Password'), crypto.randomUUID());
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByRole('alert');
     expect(screen.getByLabelText('Password')).toHaveValue('');
@@ -103,19 +111,19 @@ describe('authenticated marketplace routes', () => {
   it('validates blank login before sending credentials', async () => { const fetcher=mockApi(() => [500,{}]); open('/login/buyer'); await userEvent.click(screen.getByRole('button',{name:/sign in/i})); expect(screen.getByRole('alert')).toHaveTextContent(/email and password/i); expect(fetcher).not.toHaveBeenCalled(); });
   it.each(['BUYER','SELLER','ADMIN'])('routes by auth/me identity rather than chosen login role: %s', async role => {
     mockApi(path => path==='/auth/login' ? [200,{access_token:'test-token',expires_in:900,token_type:'bearer',user:account('BUYER')}] : path==='/auth/me' ? [200,account(role)] : path==='/sellers/me' ? [404,{}] : [200,[]]);
-    open('/login/buyer'); await userEvent.type(screen.getByLabelText('Email address'),'ravi@example.test'); await userEvent.type(screen.getByLabelText('Password'),crypto.randomUUID()); await userEvent.click(screen.getByRole('button',{name:/sign in/i}));
+    open('/login/buyer'); await enterText(screen.getByLabelText('Email address'),'ravi@example.test'); await enterText(screen.getByLabelText('Password'),crypto.randomUUID()); await userEvent.click(screen.getByRole('button',{name:/sign in/i}));
     await screen.findByRole('button',{name:/log out/i}); expect(screen.getByText(role==='SELLER'?'Seller Studio':`${role.toLowerCase()} workspace`)).toBeInTheDocument();
   });
-  it.each([401,503])('reports login failure %s and clears the password', async status => { mockApi(() => [status,{detail:'private'}]); open('/login/buyer'); await userEvent.type(screen.getByLabelText('Email address'),'ravi@example.test'); await userEvent.type(screen.getByLabelText('Password'),crypto.randomUUID()); await userEvent.click(screen.getByRole('button',{name:/sign in/i})); await screen.findByRole('alert'); expect(screen.getByLabelText('Password')).toHaveValue(''); expect(getAccessToken()).toBeNull(); });
+  it.each([401,503])('reports login failure %s and clears the password', async status => { mockApi(() => [status,{detail:'private'}]); open('/login/buyer'); await enterText(screen.getByLabelText('Email address'),'ravi@example.test'); await enterText(screen.getByLabelText('Password'),crypto.randomUUID()); await userEvent.click(screen.getByRole('button',{name:/sign in/i})); await screen.findByRole('alert'); expect(screen.getByLabelText('Password')).toHaveValue(''); expect(getAccessToken()).toBeNull(); });
   it('highlights sanitized backend login validation errors',async()=>{
-    mockApi(()=>[422,{detail:[{loc:['body','email'],type:'value_error',msg:'private input',input:'private input'}]}]);open('/login/buyer');await userEvent.type(screen.getByLabelText('Email address'),'invalid');await userEvent.type(screen.getByLabelText('Password'),crypto.randomUUID());await userEvent.click(screen.getByRole('button',{name:/sign in/i}));await screen.findByRole('alert');expect(screen.getByLabelText('Email address')).toHaveAttribute('aria-invalid','true');expect(screen.queryByText('private input')).not.toBeInTheDocument();
+    mockApi(()=>[422,{detail:[{loc:['body','email'],type:'value_error',msg:'private input',input:'private input'}]}]);open('/login/buyer');await enterText(screen.getByLabelText('Email address'),'invalid');await enterText(screen.getByLabelText('Password'),crypto.randomUUID());await userEvent.click(screen.getByRole('button',{name:/sign in/i}));await screen.findByRole('alert');expect(screen.getByLabelText('Email address')).toHaveAttribute('aria-invalid','true');expect(screen.queryByText('private input')).not.toBeInTheDocument();
   });
   it('offers only public buyer/seller registration and explains profile setup', async () => {
     const fetcher=mockApi((path,method,body) => { expect(path).toBe('/auth/register'); expect(method).toBe('POST'); expect(body.role).toBe('SELLER'); expect(body.phone).toBe('1000000001'); return [201,account('SELLER')]; });
     open('/register'); expect(screen.queryByRole('option',{name:'Admin'})).not.toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Name'),'Ravi'); await userEvent.type(screen.getByLabelText('Email address'),'ravi@example.test'); await userEvent.type(screen.getByLabelText('Phone'),'1000000001'); await userEvent.type(screen.getByLabelText('Password'),crypto.randomUUID()); await userEvent.selectOptions(screen.getByLabelText('Account type'),'SELLER'); await userEvent.click(screen.getByRole('button',{name:/create account/i})); await screen.findByText(/account created.*profile/i); expect(fetcher).toHaveBeenCalledOnce(); expect(screen.getByLabelText('Password')).toHaveValue('');
+    await enterText(screen.getByLabelText('Name'),'Ravi'); await enterText(screen.getByLabelText('Email address'),'ravi@example.test'); await enterText(screen.getByLabelText('Phone'),'1000000001'); await enterText(screen.getByLabelText('Password'),crypto.randomUUID()); await userEvent.selectOptions(screen.getByLabelText('Account type'),'SELLER'); await userEvent.click(screen.getByRole('button',{name:/create account/i})); await screen.findByText(/account created.*profile/i); expect(fetcher).toHaveBeenCalledOnce(); expect(screen.getByLabelText('Password')).toHaveValue('');
   });
-  it.each([409,422])('reports registration rejection %s', async status => { mockApi(() => [status,{}]); open('/register'); await userEvent.type(screen.getByLabelText('Name'),'Ravi'); await userEvent.type(screen.getByLabelText('Email address'),'ravi@example.test'); await userEvent.type(screen.getByLabelText('Phone'),'1000000001'); await userEvent.type(screen.getByLabelText('Password'),crypto.randomUUID()); await userEvent.click(screen.getByRole('button',{name:/create account/i})); await screen.findByRole('alert'); expect(screen.getByLabelText('Password')).toHaveValue(''); });
+  it.each([409,422])('reports registration rejection %s', async status => { mockApi(() => [status,{}]); open('/register'); await enterText(screen.getByLabelText('Name'),'Ravi'); await enterText(screen.getByLabelText('Email address'),'ravi@example.test'); await enterText(screen.getByLabelText('Phone'),'1000000001'); await enterText(screen.getByLabelText('Password'),crypto.randomUUID()); await userEvent.click(screen.getByRole('button',{name:/create account/i})); await screen.findByRole('alert'); expect(screen.getByLabelText('Password')).toHaveValue(''); });
   it('restores an existing in-memory credential using auth/me, then logout clears it', async () => { setAccessToken('restored'); mockApi(path => path==='/auth/me' ? [200,account()] : [200,[]]); open('/buyer/orders'); await screen.findByRole('heading',{name:'Your orders'}); await userEvent.click(screen.getByRole('button',{name:/log out/i})); await screen.findByRole('heading',{name:/welcome back/i}); expect(getAccessToken()).toBeNull(); });
   it('clears an invalid restored credential and shows a useful notice', async () => { setAccessToken('expired'); mockApi(() => [401,{}]); open('/buyer/orders'); await screen.findByRole('heading',{name:/welcome back/i}); expect(getAccessToken()).toBeNull(); expect(screen.getByRole('alert')).toHaveTextContent(/sign in/i); });
   it.each(['BUYER','SELLER'])('blocks a valid %s from the admin workspace', async role => { setAccessToken('test-token'); const fetcher=mockApi(() => [200,account(role)]); open('/admin'); await screen.findByText(/This page is not available for your account/i); expect(fetcher.mock.calls.filter(([url])=>String(url).endsWith('/auth/me'))).toHaveLength(1); expect(fetcher.mock.calls.every(([url])=>/\/(auth\/me|notifications\/unread-count|wishlist)$/.test(String(url)))).toBe(true); });
